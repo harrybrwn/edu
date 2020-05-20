@@ -5,5 +5,7 @@ build:
 	go build $(GOFLAGS)
 
 install:
-	go insatll $(GOFLAGS)
+	go install $(GOFLAGS)
 
+clean:
+	go clean

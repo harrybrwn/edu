@@ -7,7 +7,9 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/harrybrwn/errs"
 	"github.com/harrybrwn/go-canvas"
+	table "github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -46,14 +48,13 @@ func init() {
 
 	viper.SetEnvPrefix("edu")
 	viper.BindEnv("host")
-	// viper.BindEnv("token", "CANVAS_TOKEN")
 	viper.BindEnv("canvas_token", "CANVAS_TOKEN")
 	viper.BindEnv("editor", "EDITOR")
 }
 
 var (
 	root = &cobra.Command{
-		Use:           "canvas",
+		Use:           "edu",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		Version:       version,
@@ -66,7 +67,8 @@ var (
 			if token != "" {
 				canvas.SetToken(os.ExpandEnv(token))
 			} else {
-				canvas.SetToken(os.ExpandEnv(viper.GetString("canvas_token")))
+				viper.Set("token", viper.GetString("canvas_token"))
+				canvas.SetToken(os.ExpandEnv(viper.GetString("token")))
 			}
 			canvas.ConcurrentErrorHandler = errorHandler
 		},
@@ -90,7 +92,7 @@ var (
 			case "fish":
 				return root.GenFishCompletion(out, false)
 			}
-			return errors.New("unknown shell type")
+			return errs.New("unknown shell type")
 		},
 		ValidArgs: []string{"zsh", "bash", "ps", "powershell", "fish"},
 		Aliases:   []string{"comp"},
@@ -135,20 +137,24 @@ func newCoursesCmd() *cobra.Command {
 		all bool
 	)
 	c := &cobra.Command{
-		Use:   "courses",
-		Short: "Show info on courses",
+		Use:     "courses",
+		Short:   "Show info on courses",
+		Aliases: []string{"course", "c"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var (
 				err     error
 				courses []*canvas.Course
 			)
-			if all {
-				courses, err = canvas.Courses()
-			} else {
-				courses, err = canvas.ActiveCourses()
-			}
+			courses, err = canvas.ActiveCourses()
 			if err != nil {
 				return err
+			}
+			if all {
+				completed, err := canvas.CompletedCourses()
+				if err != nil {
+					return err
+				}
+				courses = append(courses, completed...)
 			}
 			var namelen = 1
 			for _, course := range courses {
@@ -156,10 +162,25 @@ func newCoursesCmd() *cobra.Command {
 					namelen = len(course.Name)
 				}
 			}
-			fmt.Printf("id     %*.*s %s%s course code\n", namelen+1, namelen, strings.Repeat(" ", namelen), "uuid", strings.Repeat(" ", 37))
-			for _, c := range courses {
-				fmt.Printf("%d %*.*s  %s  %s\n", c.ID, namelen+1, namelen, c.Name, c.UUID, c.CourseCode)
+
+			tab := table.NewWriter(os.Stdout)
+			header := []string{"id", "name", "uuid", "code", "ends"}
+			headercolors := make([]table.Colors, len(header))
+			for i := range header {
+				headercolors[i] = table.Colors{table.FgCyanColor}
 			}
+			tab.SetBorder(false)
+			tab.SetColumnSeparator("")
+			tab.SetAlignment(table.ALIGN_LEFT)
+			tab.SetAutoFormatHeaders(false)
+			tab.SetHeaderLine(false)
+			tab.SetHeaderAlignment(table.ALIGN_LEFT)
+			tab.SetHeader(header)
+			tab.SetHeaderColor(headercolors...)
+			for _, c := range courses {
+				tab.Append([]string{fmt.Sprintf("%d", c.ID), c.Name, c.UUID, c.CourseCode, c.EndAt.Format("01/02/06")})
+			}
+			tab.Render()
 			return nil
 		},
 	}
