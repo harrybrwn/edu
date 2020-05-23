@@ -23,10 +23,10 @@ func Execute() (err error) {
 	}
 
 	root.AddCommand(
-		newFilesCmd(),
+		canvasCmd,
+		newUpdateCmd(),
 		newConfigCmd(),
 		newCoursesCmd(),
-		newUpdateCmd(),
 		completionCmd,
 	)
 
@@ -42,6 +42,11 @@ func Execute() (err error) {
 func init() {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
+
+	viper.AddConfigPath("$XDG_CONFIG_HOME/edu")
+	viper.AddConfigPath("$HOME/.config/edu")
+	viper.AddConfigPath("$HOME/.edu")
+
 	viper.AddConfigPath("$XDG_CONFIG_HOME/canvas")
 	viper.AddConfigPath("$HOME/.config/canvas")
 	viper.AddConfigPath("$HOME/.canvas")
@@ -49,7 +54,7 @@ func init() {
 	viper.SetEnvPrefix("edu")
 	viper.BindEnv("host")
 	viper.BindEnv("canvas_token", "CANVAS_TOKEN")
-	viper.BindEnv("editor", "EDITOR")
+	viper.SetDefault("editor", os.Getenv("EDITOR"))
 }
 
 var (
@@ -73,6 +78,13 @@ var (
 			canvas.ConcurrentErrorHandler = errorHandler
 		},
 	}
+
+	canvasCmd = &cobra.Command{
+		Use:     "canvas",
+		Aliases: []string{"canv", "ca"},
+		Short:   "A small collection of helper commands for canvas",
+	}
+
 	completionCmd = &cobra.Command{
 		Use:   "completion",
 		Short: "Print a completion script to stdout.",
@@ -99,39 +111,6 @@ var (
 	}
 )
 
-func newFilesCmd() *cobra.Command {
-	var (
-		contentType string
-		sortby      = []string{"created_at"}
-	)
-	c := &cobra.Command{
-		Use:   "files",
-		Short: "This is a garbage command lol.",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			courses, err := canvas.ActiveCourses()
-			if err != nil {
-				return err
-			}
-
-			opts := []canvas.Option{canvas.SortOpt(sortby...)}
-			if contentType != "" {
-				opts = append(opts, canvas.ContentType(contentType))
-			}
-			for _, course := range courses {
-				course.SetErrorHandler(errorHandler)
-				files := course.Files(opts...)
-				for f := range files {
-					fmt.Println(f.CreatedAt, f.Size, f.Filename)
-				}
-			}
-			return nil
-		},
-	}
-	c.Flags().StringVarP(&contentType, "content-type", "c", "", "filter out files by content type (ex. application/pdf)")
-	c.Flags().StringArrayVarP(&sortby, "sortyby", "s", sortby, "how the files should be sorted")
-	return c
-}
-
 func newCoursesCmd() *cobra.Command {
 	var (
 		all bool
@@ -139,22 +118,15 @@ func newCoursesCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:     "courses",
 		Short:   "Show info on courses",
-		Aliases: []string{"course", "c"},
+		Aliases: []string{"course", "crs"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var (
 				err     error
 				courses []*canvas.Course
 			)
-			courses, err = canvas.ActiveCourses()
+			courses, err = getCourses(all)
 			if err != nil {
 				return err
-			}
-			if all {
-				completed, err := canvas.CompletedCourses()
-				if err != nil {
-					return err
-				}
-				courses = append(courses, completed...)
 			}
 			var namelen = 1
 			for _, course := range courses {
@@ -162,7 +134,6 @@ func newCoursesCmd() *cobra.Command {
 					namelen = len(course.Name)
 				}
 			}
-
 			tab := table.NewWriter(os.Stdout)
 			header := []string{"id", "name", "uuid", "code", "ends"}
 			headercolors := make([]table.Colors, len(header))
@@ -247,9 +218,8 @@ func errorMessage(err error) {
 	}
 }
 
-func errorHandler(e error, stop chan int) {
+func errorHandler(e error) {
 	if e != nil {
-		stop <- 1
 		fmt.Println("Error: " + e.Error())
 		os.Exit(1)
 	}

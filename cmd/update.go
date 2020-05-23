@@ -59,12 +59,7 @@ func newUpdateCmd() *cobra.Command {
 }
 
 func (uc *updateCmd) run(cmd *cobra.Command, args []string) (err error) {
-	var courses []*canvas.Course
-	if uc.all {
-		courses, err = canvas.Courses()
-	} else {
-		courses, err = canvas.ActiveCourses()
-	}
+	courses, err := getCourses(uc.all)
 	if err != nil {
 		return err
 	}

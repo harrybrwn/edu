@@ -84,6 +84,8 @@ github.com/harrybrwn/errs v0.0.1 h1:zT9uVS1xYArWz5KEhPgRNLykCs9ZK7EZz+fkMHvhx9I=
 github.com/harrybrwn/errs v0.0.1/go.mod h1:xekiTrup1h5u3YF9bpJT7qD1cmgYBA8qN9iHd/h/sho=
 github.com/harrybrwn/go-canvas v0.0.1 h1:6/6Z83DbpFtNKVplGYqalllYx4tdbCvk5HtBa63b2rM=
 github.com/harrybrwn/go-canvas v0.0.1/go.mod h1:Vg8sito7IqyCI7iZUADbOUmVvMYQqkGOJA6ezaWkSqI=
+github.com/harrybrwn/go-canvas v0.0.2-0.20200522003549-77e19c099bf9 h1:Vkh3JXnWAOCamW+1/5JDTRqVVp8CMO4v86HfWYweH9s=
+github.com/harrybrwn/go-canvas v0.0.2-0.20200522003549-77e19c099bf9/go.mod h1:Vg8sito7IqyCI7iZUADbOUmVvMYQqkGOJA6ezaWkSqI=
 github.com/hashicorp/consul/api v1.1.0/go.mod h1:VmuI/Lkw1nC05EYQWNKwWGbkg+FbDBtguAZLlVdkD9Q=
 github.com/hashicorp/consul/sdk v0.1.1/go.mod h1:VKf9jXwCTEY1QZP2MOLRhb5i/I/ssyNV1vwHyQBF0x8=
 github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
@@ -144,6 +146,8 @@ github.com/mitchellh/mapstructure v1.1.2 h1:fmNYVwqnSfB9mZU6OS2O6GsXM+wcskZDuKQz
 github.com/mitchellh/mapstructure v1.1.2/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
 github.com/mitchellh/mapstructure v1.3.0 h1:iDwIio/3gk2QtLLEsqU5lInaMzos0hDTz8a6lazSFVw=
 github.com/mitchellh/mapstructure v1.3.0/go.mod h1:bFUtVrKA4DC2yAKiSyO/QUcy7e+RRV2QTWOzhPopBRo=
+github.com/mitchellh/mapstructure v1.3.1 h1:cCBH2gTD2K0OtLlv/Y5H01VQCqmlDxz30kS5Y5bqfLA=
+github.com/mitchellh/mapstructure v1.3.1/go.mod h1:bFUtVrKA4DC2yAKiSyO/QUcy7e+RRV2QTWOzhPopBRo=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/reflect2 v1.0.1/go.mod h1:bx2lNnkwVCuqBIxFjflWJWanXIb3RllmbCylyMrvgv0=
 github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=

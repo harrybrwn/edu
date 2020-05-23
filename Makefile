@@ -9,3 +9,5 @@ install:
 
 clean:
 	go clean
+
+.PHONY: build install clean
