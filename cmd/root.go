@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -28,6 +29,7 @@ func Execute() (err error) {
 		newConfigCmd(),
 		newCoursesCmd(),
 		completionCmd,
+		newRegistrationCmd(),
 	)
 
 	err = root.Execute()
@@ -113,7 +115,8 @@ var (
 
 func newCoursesCmd() *cobra.Command {
 	var (
-		all bool
+		all     bool
+		pending bool
 	)
 	c := &cobra.Command{
 		Use:     "courses",
@@ -124,7 +127,11 @@ func newCoursesCmd() *cobra.Command {
 				err     error
 				courses []*canvas.Course
 			)
-			courses, err = getCourses(all)
+			if pending {
+				courses, err = canvas.Courses(canvas.Opt("enrollment_state", "invited_or_pending"))
+			} else {
+				courses, err = getCourses(all)
+			}
 			if err != nil {
 				return err
 			}
@@ -134,20 +141,9 @@ func newCoursesCmd() *cobra.Command {
 					namelen = len(course.Name)
 				}
 			}
-			tab := table.NewWriter(os.Stdout)
+			tab := newTable(cmd.OutOrStderr())
 			header := []string{"id", "name", "uuid", "code", "ends"}
-			headercolors := make([]table.Colors, len(header))
-			for i := range header {
-				headercolors[i] = table.Colors{table.FgCyanColor}
-			}
-			tab.SetBorder(false)
-			tab.SetColumnSeparator("")
-			tab.SetAlignment(table.ALIGN_LEFT)
-			tab.SetAutoFormatHeaders(false)
-			tab.SetHeaderLine(false)
-			tab.SetHeaderAlignment(table.ALIGN_LEFT)
-			tab.SetHeader(header)
-			tab.SetHeaderColor(headercolors...)
+			setTableHeader(tab, header)
 			for _, c := range courses {
 				tab.Append([]string{fmt.Sprintf("%d", c.ID), c.Name, c.UUID, c.CourseCode, c.EndAt.Format("01/02/06")})
 			}
@@ -155,7 +151,9 @@ func newCoursesCmd() *cobra.Command {
 			return nil
 		},
 	}
-	c.Flags().BoolVarP(&all, "all", "a", all, "show all courses (defaults to only active courses)")
+	flags := c.Flags()
+	flags.BoolVarP(&all, "all", "a", all, "show all courses (defaults to only active courses)")
+	flags.BoolVar(&pending, "pending", pending, "show all invited or pending courses")
 	return c
 }
 
@@ -198,6 +196,17 @@ func newConfigCmd() *cobra.Command {
 	return cmd
 }
 
+func newTable(r io.Writer) *table.Table {
+	t := table.NewWriter(r)
+	t.SetBorder(false)
+	t.SetColumnSeparator("")
+	t.SetAlignment(table.ALIGN_LEFT)
+	t.SetAutoFormatHeaders(false)
+	t.SetHeaderLine(false)
+	t.SetHeaderAlignment(table.ALIGN_LEFT)
+	return t
+}
+
 func mkdir(d string) error {
 	if _, err := os.Stat(d); os.IsNotExist(err) {
 		if err = os.MkdirAll(d, 0775); err != nil {
@@ -218,11 +227,12 @@ func errorMessage(err error) {
 	}
 }
 
-func errorHandler(e error) {
+func errorHandler(e error) error {
 	if e != nil {
 		fmt.Println("Error: " + e.Error())
 		os.Exit(1)
 	}
+	return nil
 }
 
 func stop(msg string) {

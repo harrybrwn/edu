@@ -130,6 +130,35 @@ func (uc *updateCmd) checkReplacementPats(c *canvas.Course, patterns []replaceme
 	})
 }
 
+func downloadTo(
+	to io.WriterTo,
+	filename string,
+	stdout, stderr io.Writer,
+	wg *sync.WaitGroup,
+) (err error) {
+	defer wg.Done()
+	osfile, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	if os.IsExist(err) {
+		fmt.Fprintf(stdout, "file exists %s\n", filename)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if e := osfile.Close(); e != nil {
+			err = e
+		}
+		if err != nil {
+			errmsg(err)
+			fmt.Fprintf(stderr, "Error: %s", err.Error())
+		}
+	}()
+	fmt.Fprintf(stdout, "getting %s\n", filename)
+	_, err = to.WriteTo(osfile) // download the contents to the file
+	return err
+}
+
 func download(file, url string, stdout, stderr io.Writer, wg *sync.WaitGroup) (err error) {
 	defer func() {
 		if err != nil {
@@ -138,7 +167,8 @@ func download(file, url string, stdout, stderr io.Writer, wg *sync.WaitGroup) (e
 		}
 		wg.Done()
 	}()
-	if _, err = os.Stat(file); !os.IsNotExist(err) {
+	_, err = os.Stat(file)
+	if !os.IsNotExist(err) {
 		fmt.Fprintf(stdout, "file exists %s\n", file)
 		return nil
 	}

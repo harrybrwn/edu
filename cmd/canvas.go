@@ -25,16 +25,9 @@ func newFilesCmd() *cobra.Command {
 		Use:   "files",
 		Short: "List course files.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			courses, err := canvas.ActiveCourses()
+			courses, err := getCourses(all)
 			if err != nil {
 				return err
-			}
-			if all {
-				completed, err := canvas.CompletedCourses()
-				if err != nil {
-					return err
-				}
-				courses = append(courses, completed...)
 			}
 
 			opts := []canvas.Option{canvas.SortOpt(sortby...)}
@@ -43,7 +36,6 @@ func newFilesCmd() *cobra.Command {
 			}
 			count := 0
 			for _, course := range courses {
-				course.SetErrorHandler(errorHandler)
 				files := course.Files(opts...)
 				for f := range files {
 					cmd.Println(f.CreatedAt, f.Size, f.Filename)
@@ -90,16 +82,21 @@ var (
 )
 
 func getCourses(all bool) ([]*canvas.Course, error) {
-	courses, err := canvas.ActiveCourses()
+	courses, err := canvas.Courses(canvas.ActiveCourses)
 	if err != nil {
 		return nil, err
 	}
 	if all {
-		completed, err := canvas.CompletedCourses()
+		completed, err := canvas.Courses(canvas.CompletedCourses)
 		if err != nil {
 			return courses, err
 		}
 		courses = append(courses, completed...)
+		pending, err := canvas.Courses(canvas.InvitedOrPendingCourses)
+		if err != nil {
+			return courses, err
+		}
+		courses = append(courses, pending...)
 	}
 	return courses, nil
 }
