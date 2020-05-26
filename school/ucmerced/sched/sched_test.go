@@ -1,12 +1,13 @@
 package sched
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
 
 func TestGet(t *testing.T) {
-	sch, err := Get("spring", "2020")
+	sch, err := Get(2020, "spring")
 	if err != nil {
 		t.Error(err)
 	}
@@ -28,7 +29,7 @@ func TestGet(t *testing.T) {
 			t.Error("should not be zero")
 		}
 	}
-	sch, err = BySubject("spring", "2020", "cse")
+	sch, err = BySubject(2020, "spring", "cse")
 	if err != nil {
 		t.Error(err)
 	}
@@ -40,12 +41,22 @@ func TestGet(t *testing.T) {
 }
 
 func TestSched_Err(t *testing.T) {
-	_, err := Get("", "2020")
+	_, err := Get(2020, "")
 	if err == nil {
 		t.Error("expected an error for a bad term")
 	}
-	_, err = Get("spring", "1850")
+	_, err = Get(1850, "spring")
 	if err == nil {
 		t.Error("expeted an error for a rediculous year")
+	}
+}
+
+func Test(t *testing.T) {
+	s, err := BySubject(2020, "summer", "cse")
+	if err != nil {
+		t.Error(err)
+	}
+	for _, c := range s {
+		fmt.Println(c.Title)
 	}
 }

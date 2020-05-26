@@ -9,7 +9,6 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/harrybrwn/errs"
-	"golang.org/x/net/html"
 )
 
 const selector = "div.pagebodydiv table.datadisplaytable tr"
@@ -52,23 +51,14 @@ func (c *Course) SeatsAvailible() int {
 	return seats
 }
 
-func parseSchedual(node *html.Node) {}
-
-var newlineNode = &html.Node{
-	FirstChild: nil,
-	LastChild:  nil,
-	Type:       html.TextNode,
-	Data:       "\n",
-}
-
 // Get gets the schedual
-func Get(year, term string) (Schedual, error) {
+func Get(year int, term string) (Schedual, error) {
 	return BySubject(year, term, "")
 }
 
 // BySubject gets the schedual and only one subject given a subject code.
-func BySubject(year, term, subject string) (Schedual, error) {
-	resp, err := getData(term, year, strings.ToUpper(subject), false)
+func BySubject(year int, term, subject string) (Schedual, error) {
+	resp, err := getData(fmt.Sprintf("%d", year), term, strings.ToUpper(subject), false)
 	if err != nil {
 		return nil, err
 	}

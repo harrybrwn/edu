@@ -86,6 +86,10 @@ github.com/harrybrwn/go-canvas v0.0.1 h1:6/6Z83DbpFtNKVplGYqalllYx4tdbCvk5HtBa63
 github.com/harrybrwn/go-canvas v0.0.1/go.mod h1:Vg8sito7IqyCI7iZUADbOUmVvMYQqkGOJA6ezaWkSqI=
 github.com/harrybrwn/go-canvas v0.0.2-0.20200522003549-77e19c099bf9 h1:Vkh3JXnWAOCamW+1/5JDTRqVVp8CMO4v86HfWYweH9s=
 github.com/harrybrwn/go-canvas v0.0.2-0.20200522003549-77e19c099bf9/go.mod h1:Vg8sito7IqyCI7iZUADbOUmVvMYQqkGOJA6ezaWkSqI=
+github.com/harrybrwn/go-canvas v0.0.2-0.20200524003514-19536528f7dd h1:pz9M3o3e6jg5TK/HyNqPp41uXgB1dchK0n31Lzg5pfs=
+github.com/harrybrwn/go-canvas v0.0.2-0.20200524003514-19536528f7dd/go.mod h1:XyL2Yw/N8R3gDD7Kkx726IpF+R436ABf2Dtmm927JlM=
+github.com/harrybrwn/go-canvas v0.0.2-0.20200524084700-8a1df4168a01 h1:FEgliEcw0rFtmNO43xa3toOTIfRaA9pLx6o7V+dvdd0=
+github.com/harrybrwn/go-canvas v0.0.2-0.20200524084700-8a1df4168a01/go.mod h1:XyL2Yw/N8R3gDD7Kkx726IpF+R436ABf2Dtmm927JlM=
 github.com/hashicorp/consul/api v1.1.0/go.mod h1:VmuI/Lkw1nC05EYQWNKwWGbkg+FbDBtguAZLlVdkD9Q=
 github.com/hashicorp/consul/sdk v0.1.1/go.mod h1:VKf9jXwCTEY1QZP2MOLRhb5i/I/ssyNV1vwHyQBF0x8=
 github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
