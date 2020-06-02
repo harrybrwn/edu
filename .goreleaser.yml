@@ -1,0 +1,95 @@
+project_name: edu
+
+before:
+  hooks:
+    - go mod tidy
+
+release:
+  github:
+    owner: harrybrwn
+    name: edu
+  prerelease: auto
+
+builds:
+  - binary: edu
+    id: edu
+    env:
+      - CGO_ENABLED=0
+      - GO111MODULE=on
+    ldflags:
+      - -s -w
+      - -X github.com/harrybrwn/edu/cmd.version={{.Version}}
+    goos: [linux, darwin, windows]
+    goarch: [386, amd64, arm64]
+    ignore:
+      - { goos: darwin,  goarch: 386   }
+      - { goos: darwin,  goarch: arm64 }
+      - { goos: windows, goarch: arm64 }
+
+archives:
+  - replacements: &replacements
+      darwin: MacOS
+      linux: Linux
+      windows: Windows
+      386: 32-bit
+      amd64: 64-bit
+      arm64: arm64
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - LICENSE
+      - README.md
+      - docs/*
+
+nfpms:
+  - <<: &description
+      description: Command line tool for managing school stuff
+    file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    replacements: *replacements
+    maintainer: Harry Brown <harrybrown98@gmail.com>
+    license: Apache 2.0
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/local/bin
+
+brews:
+  - <<: *description
+    name: edu
+    github:
+      owner: harrybrwn
+      name: edu
+    homepage: https://github.com/harrybrwn/edu
+    commit_author:
+      name: releasebot
+      email: harrybrown98@gmail.com
+    folder: Formula
+    skip_upload: true
+    test: |
+      system "#{bin}/edu --version"
+    install: |
+      bin.install "edu"
+
+snapcrafts:
+  - <<: *description
+    name_template: '{{ .ProjectName }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+    base: core18
+    summary: Command line tool for managing school stuff
+    grade: stable
+    confinement: strict
+    publish: false
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ .Version }}-{{ .ShortCommit }}"
+
+changelog:
+  skip: true
+  sort: asc
+  filters:
+    exclude:
+    - '^docs:'
+    - '^test:'

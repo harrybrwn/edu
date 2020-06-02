@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"strings"
+	"path/filepath"
 
 	"github.com/harrybrwn/errs"
 	"github.com/harrybrwn/go-canvas"
@@ -19,8 +19,15 @@ var version string
 
 // Execute will execute the root comand on the cli
 func Execute() (err error) {
-	if err = viper.ReadInConfig(); err != nil {
-		return err
+	err = viper.ReadInConfig()
+	if _, ok := err.(viper.ConfigFileNotFoundError); err != nil && ok {
+		path := os.ExpandEnv("$HOME/.config/edu")
+		if err = mkdir(path); err != nil {
+			return fmt.Errorf("couldn't create config dir: %w", err)
+		}
+		viper.SetConfigFile(filepath.Join(path, "config.yml"))
+	} else if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 	}
 
 	root.AddCommand(
@@ -43,7 +50,7 @@ func Execute() (err error) {
 
 func init() {
 	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
+	viper.SetConfigType("yml")
 
 	viper.AddConfigPath("$XDG_CONFIG_HOME/edu")
 	viper.AddConfigPath("$HOME/.config/edu")
@@ -166,20 +173,17 @@ func newConfigCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			f := viper.ConfigFileUsed()
 			if file {
-				cmd.Println(f)
+				fmt.Println(f)
 				return nil
 			}
 			if edit {
+				if f == "" {
+					return errs.New("no config file found")
+				}
 				editor := viper.GetString("editor")
 				ex := exec.Command(editor, f)
 				ex.Stdout, ex.Stderr, ex.Stdin = os.Stdout, os.Stderr, os.Stdin
 				return ex.Run()
-			}
-			if len(args) > 1 {
-				if strings.ToLower(args[0]) == "get" {
-					cmd.Println(viper.Get(args[0]))
-					return nil
-				}
 			}
 			return cmd.Usage()
 		},

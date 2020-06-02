@@ -25,8 +25,10 @@ type Schedual map[int]*Course
 // Course holds data for a specific
 // course that has been parsed from the courses table.
 type Course struct {
-	CRN          int
-	Number       string
+	CRN      int
+	Fullcode string
+	Number   string
+
 	Title        string
 	Units        int
 	Activity     string
@@ -120,7 +122,7 @@ func newCourse(data []string) (*Course, error) {
 	}
 	c := &Course{
 		CRN:            crn,
-		Number:         data[1],
+		Fullcode:       data[1],
 		Title:          data[2],
 		Units:          units,
 		Activity:       data[4],
@@ -132,6 +134,10 @@ func newCourse(data []string) (*Course, error) {
 		MaxEnrolled:    maxenrl,
 		ActiveEnrolled: activenrl,
 		seats:          data[12],
+	}
+	parts := strings.Split(c.Fullcode, "-")
+	if len(parts) >= 2 {
+		c.Number = parts[1]
 	}
 	return c, nil
 }

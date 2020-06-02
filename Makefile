@@ -7,7 +7,11 @@ build:
 install:
 	go install $(GOFLAGS)
 
+dist:
+	goreleaser releaser --skip-publish --snapshot
+
 clean:
 	go clean
+	$(RM) -r dist
 
-.PHONY: build install clean
+.PHONY: build install clean dist

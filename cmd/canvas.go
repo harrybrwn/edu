@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/harrybrwn/go-canvas"
 	"github.com/spf13/cobra"
 )
@@ -18,8 +16,9 @@ func init() {
 func newFilesCmd() *cobra.Command {
 	var (
 		contentType string
-		sortby      = []string{"created_at"}
-		all         bool
+		// search      string
+		sortby = []string{"created_at"}
+		all    bool
 	)
 	c := &cobra.Command{
 		Use:   "files",
@@ -32,7 +31,7 @@ func newFilesCmd() *cobra.Command {
 
 			opts := []canvas.Option{canvas.SortOpt(sortby...)}
 			if contentType != "" {
-				opts = append(opts, canvas.ContentType(contentType))
+				opts = append(opts, canvas.ContentTypes(contentType))
 			}
 			count := 0
 			for _, course := range courses {
@@ -49,6 +48,7 @@ func newFilesCmd() *cobra.Command {
 	flags := c.Flags()
 	flags.BoolVarP(&all, "all", "a", all, "get files from all courses")
 	flags.StringVarP(&contentType, "content-type", "c", "", "filter out files by content type (ex. application/pdf)")
+	// flags.StringVar(&search, "search", "", "search for files by name")
 	flags.StringArrayVarP(&sortby, "sortyby", "s", sortby, "how the files should be sorted")
 	return c
 }
@@ -71,13 +71,21 @@ var (
 			if err != nil {
 				return err
 			}
+			tab := newTable(cmd.OutOrStdout())
 			for _, course := range courses {
 				for as := range course.Assignments() {
-					fmt.Println(as.Name, as.DueAt)
+					tab.Append([]string{as.Name, as.DueAt.String()})
 				}
 			}
+			tab.Render()
 			return nil
 		},
+	}
+
+	testCmd = &cobra.Command{
+		Use:    "test",
+		Hidden: false,
+		RunE:   func(cmd *cobra.Command, args []string) error { return nil },
 	}
 )
 

@@ -80,7 +80,7 @@ func (uc *updateCmd) run(cmd *cobra.Command, args []string) (err error) {
 
 	uc.wg.Add(len(courses))
 	for _, course := range courses {
-		reps, ok := coursereps[strings.ToLower(course.CourseCode)]
+		reps, ok := coursereps[course.CourseCode]
 		if !ok {
 			reps = replacements
 		} else {
@@ -263,7 +263,7 @@ func getReplacements() (map[string][]replacement, []replacement, error) {
 		mapstructure.Decode(filepats, &reps),
 		mapstructure.Decode(coursePats, &courseReps),
 	)
-	return courseReps, reps, err
+	return upperMapKeys(courseReps), reps, err
 }
 
 func relpath(base, p string) string {
@@ -283,4 +283,12 @@ func viperTryGetKeys(keys []string) interface{} {
 		}
 	}
 	return result
+}
+
+func upperMapKeys(m map[string][]replacement) map[string][]replacement {
+	cp := make(map[string][]replacement)
+	for key, val := range m {
+		cp[strings.ToUpper(key)] = val
+	}
+	return cp
 }
