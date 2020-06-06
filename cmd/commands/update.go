@@ -1,4 +1,4 @@
-package cmd
+package commands
 
 import (
 	"fmt"
@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harrybrwn/edu/cmd/internal"
 	"github.com/harrybrwn/errs"
 	"github.com/harrybrwn/go-canvas"
 	"github.com/mitchellh/mapstructure"
@@ -59,7 +60,7 @@ func newUpdateCmd() *cobra.Command {
 }
 
 func (uc *updateCmd) run(cmd *cobra.Command, args []string) (err error) {
-	courses, err := getCourses(uc.all)
+	courses, err := internal.GetCourses(uc.all)
 	if err != nil {
 		return err
 	}
@@ -89,6 +90,7 @@ func (uc *updateCmd) run(cmd *cobra.Command, args []string) (err error) {
 		go fn(course, reps)
 	}
 	uc.wg.Wait()
+	fmt.Println("done.")
 	return nil
 }
 
@@ -101,7 +103,7 @@ func (uc *updateCmd) downloadCourseFiles(c *canvas.Course, replacements []replac
 			return err
 		}
 		dir := filepath.Dir(fullpath)
-		if err := mkdir(dir); err != nil {
+		if err := internal.Mkdir(dir); err != nil {
 			return err
 		}
 		wg.Add(1)
@@ -150,7 +152,6 @@ func downloadTo(
 			err = e
 		}
 		if err != nil {
-			errmsg(err)
 			fmt.Fprintf(stderr, "Error: %s", err.Error())
 		}
 	}()
@@ -162,7 +163,6 @@ func downloadTo(
 func download(file, url string, stdout, stderr io.Writer, wg *sync.WaitGroup) (err error) {
 	defer func() {
 		if err != nil {
-			errmsg(err)
 			fmt.Fprintf(stderr, "Error: %s", err.Error())
 		}
 		wg.Done()

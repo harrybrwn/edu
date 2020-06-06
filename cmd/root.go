@@ -3,14 +3,13 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 
+	"github.com/harrybrwn/edu/cmd/commands"
+	"github.com/harrybrwn/edu/cmd/internal"
 	"github.com/harrybrwn/errs"
 	"github.com/harrybrwn/go-canvas"
-	table "github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -22,7 +21,7 @@ func Execute() (err error) {
 	err = viper.ReadInConfig()
 	if _, ok := err.(viper.ConfigFileNotFoundError); err != nil && ok {
 		path := os.ExpandEnv("$HOME/.config/edu")
-		if err = mkdir(path); err != nil {
+		if err = internal.Mkdir(path); err != nil {
 			return fmt.Errorf("couldn't create config dir: %w", err)
 		}
 		viper.SetConfigFile(filepath.Join(path, "config.yml"))
@@ -30,14 +29,8 @@ func Execute() (err error) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 	}
 
-	root.AddCommand(
-		canvasCmd,
-		newUpdateCmd(),
-		newConfigCmd(),
-		newCoursesCmd(),
-		completionCmd,
-		newRegistrationCmd(),
-	)
+	root.AddCommand(commands.All()...)
+	root.AddCommand(completionCmd)
 
 	err = root.Execute()
 	if err == nil {
@@ -55,7 +48,6 @@ func init() {
 	viper.AddConfigPath("$XDG_CONFIG_HOME/edu")
 	viper.AddConfigPath("$HOME/.config/edu")
 	viper.AddConfigPath("$HOME/.edu")
-
 	viper.AddConfigPath("$XDG_CONFIG_HOME/canvas")
 	viper.AddConfigPath("$HOME/.config/canvas")
 	viper.AddConfigPath("$HOME/.canvas")
@@ -63,7 +55,9 @@ func init() {
 	viper.SetEnvPrefix("edu")
 	viper.BindEnv("host")
 	viper.BindEnv("canvas_token", "CANVAS_TOKEN")
+
 	viper.SetDefault("editor", os.Getenv("EDITOR"))
+	viper.SetDefault("basedir", "$HOME/.edu/files")
 }
 
 var (
@@ -86,12 +80,6 @@ var (
 			}
 			canvas.ConcurrentErrorHandler = errorHandler
 		},
-	}
-
-	canvasCmd = &cobra.Command{
-		Use:     "canvas",
-		Aliases: []string{"canv", "ca"},
-		Short:   "A small collection of helper commands for canvas",
 	}
 
 	completionCmd = &cobra.Command{
@@ -120,106 +108,6 @@ var (
 	}
 )
 
-func newCoursesCmd() *cobra.Command {
-	var (
-		all     bool
-		pending bool
-	)
-	c := &cobra.Command{
-		Use:     "courses",
-		Short:   "Show info on courses",
-		Aliases: []string{"course", "crs"},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			var (
-				err     error
-				courses []*canvas.Course
-			)
-			if pending {
-				courses, err = canvas.Courses(canvas.Opt("enrollment_state", "invited_or_pending"))
-			} else {
-				courses, err = getCourses(all)
-			}
-			if err != nil {
-				return err
-			}
-			var namelen = 1
-			for _, course := range courses {
-				if len(course.Name) > namelen {
-					namelen = len(course.Name)
-				}
-			}
-			tab := newTable(cmd.OutOrStderr())
-			header := []string{"id", "name", "uuid", "code", "ends"}
-			setTableHeader(tab, header)
-			for _, c := range courses {
-				tab.Append([]string{fmt.Sprintf("%d", c.ID), c.Name, c.UUID, c.CourseCode, c.EndAt.Format("01/02/06")})
-			}
-			tab.Render()
-			return nil
-		},
-	}
-	flags := c.Flags()
-	flags.BoolVarP(&all, "all", "a", all, "show all courses (defaults to only active courses)")
-	flags.BoolVar(&pending, "pending", pending, "show all invited or pending courses")
-	return c
-}
-
-func newConfigCmd() *cobra.Command {
-	var file, edit bool
-	cmd := &cobra.Command{
-		Use:     "config",
-		Short:   "Manage configuration",
-		Aliases: []string{"conf"},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			f := viper.ConfigFileUsed()
-			if file {
-				fmt.Println(f)
-				return nil
-			}
-			if edit {
-				if f == "" {
-					return errs.New("no config file found")
-				}
-				editor := viper.GetString("editor")
-				ex := exec.Command(editor, f)
-				ex.Stdout, ex.Stderr, ex.Stdin = os.Stdout, os.Stderr, os.Stdin
-				return ex.Run()
-			}
-			return cmd.Usage()
-		},
-	}
-	cmd.AddCommand(&cobra.Command{
-		Use: "get", Short: "Get a config variable",
-		Run: func(c *cobra.Command, args []string) {
-			for _, arg := range args {
-				c.Println(viper.Get(arg))
-			}
-		}})
-	cmd.Flags().BoolVarP(&edit, "edit", "e", false, "edit the config file")
-	cmd.Flags().BoolVarP(&file, "file", "f", false, "print the config file path")
-	return cmd
-}
-
-func newTable(r io.Writer) *table.Table {
-	t := table.NewWriter(r)
-	t.SetBorder(false)
-	t.SetColumnSeparator("")
-	t.SetAlignment(table.ALIGN_LEFT)
-	t.SetAutoFormatHeaders(false)
-	t.SetHeaderLine(false)
-	t.SetHeaderAlignment(table.ALIGN_LEFT)
-	return t
-}
-
-func mkdir(d string) error {
-	if _, err := os.Stat(d); os.IsNotExist(err) {
-		if err = os.MkdirAll(d, 0775); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func errorMessage(err error) {
 	switch err.(type) {
 	case *canvas.AuthError:
@@ -237,11 +125,6 @@ func errorHandler(e error) error {
 		os.Exit(1)
 	}
 	return nil
-}
-
-func stop(msg string) {
-	errmsg(msg)
-	os.Exit(1)
 }
 
 func errmsg(msg interface{}) {

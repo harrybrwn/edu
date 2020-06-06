@@ -1,6 +1,7 @@
-package cmd
+package commands
 
 import (
+	"github.com/harrybrwn/edu/cmd/internal"
 	"github.com/harrybrwn/go-canvas"
 	"github.com/spf13/cobra"
 )
@@ -11,6 +12,12 @@ func init() {
 		// modulesCmd,
 		dueCmd,
 	)
+}
+
+var canvasCmd = &cobra.Command{
+	Use:     "canvas",
+	Aliases: []string{"canv", "ca"},
+	Short:   "A small collection of helper commands for canvas",
 }
 
 func newFilesCmd() *cobra.Command {
@@ -24,7 +31,7 @@ func newFilesCmd() *cobra.Command {
 		Use:   "files",
 		Short: "List course files.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			courses, err := getCourses(all)
+			courses, err := internal.GetCourses(all)
 			if err != nil {
 				return err
 			}
@@ -67,11 +74,12 @@ var (
 		Use:   "due",
 		Short: "List all the due date on canvas.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			courses, err := getCourses(false)
+			courses, err := internal.GetCourses(false)
 			if err != nil {
 				return err
 			}
-			tab := newTable(cmd.OutOrStdout())
+			tab := internal.NewTable(cmd.OutOrStdout())
+			internal.SetTableHeader(tab, []string{"name", "due"})
 			for _, course := range courses {
 				for as := range course.Assignments() {
 					tab.Append([]string{as.Name, as.DueAt.String()})
@@ -88,23 +96,3 @@ var (
 		RunE:   func(cmd *cobra.Command, args []string) error { return nil },
 	}
 )
-
-func getCourses(all bool) ([]*canvas.Course, error) {
-	courses, err := canvas.Courses(canvas.ActiveCourses)
-	if err != nil {
-		return nil, err
-	}
-	if all {
-		completed, err := canvas.Courses(canvas.CompletedCourses)
-		if err != nil {
-			return courses, err
-		}
-		courses = append(courses, completed...)
-		pending, err := canvas.Courses(canvas.InvitedOrPendingCourses)
-		if err != nil {
-			return courses, err
-		}
-		courses = append(courses, pending...)
-	}
-	return courses, nil
-}
