@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -39,7 +40,7 @@ registration information.`,
 				return err
 			}
 
-			tab := internal.NewTable(cmd.OutOrStderr())
+			tab := internal.NewTable(cmd.OutOrStdout())
 			header := []string{"crn", "code", "title", "activity", "time", "seats open"}
 			internal.SetTableHeader(tab, header)
 			tab.SetAutoWrapText(false)
@@ -72,7 +73,7 @@ func newCheckCRNCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			tab := internal.NewTable(cmd.OutOrStderr())
+			tab := internal.NewTable(cmd.OutOrStdout())
 			header := []string{"crn", "code", "title", "activity", "time", "seats open"}
 			internal.SetTableHeader(tab, header)
 			tab.SetAutoWrapText(false)
@@ -81,7 +82,14 @@ func newCheckCRNCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				tab.Append(courseRow(schedual[int(crn)]))
+				course, ok := schedual[int(crn)]
+				if !ok {
+					continue
+				}
+				tab.Append(courseRow(course))
+			}
+			if tab.NumLines() == 0 {
+				return &internal.Error{Msg: fmt.Sprintf("could not find %s in schedual", strings.Join(args, ", ")), Code: 1}
 			}
 			tab.Render()
 			return nil

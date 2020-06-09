@@ -1,8 +1,9 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -10,35 +11,59 @@ import (
 	"github.com/harrybrwn/edu/cmd/internal"
 	"github.com/harrybrwn/errs"
 	"github.com/harrybrwn/go-canvas"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 var version string
 
+// Logger for the cmd package
+var Logger = &lumberjack.Logger{
+	Filename:   "",
+	MaxSize:    25,  // megabytes
+	MaxBackups: 10,  // number of spare files
+	MaxAge:     365, //days
+	Compress:   false,
+}
+
+// Stop will print to stderr and exit with status 1
+func Stop(message interface{}) {
+	log.Printf("%v", message)
+	fmt.Fprintf(os.Stderr, "%v\n", message)
+	switch msg := message.(type) {
+	case *internal.Error:
+		os.Exit(msg.Code)
+	default:
+		os.Exit(1)
+	}
+}
+
 // Execute will execute the root comand on the cli
 func Execute() (err error) {
+	log.SetOutput(Logger)
+
 	err = viper.ReadInConfig()
 	if _, ok := err.(viper.ConfigFileNotFoundError); err != nil && ok {
-		path := os.ExpandEnv("$HOME/.config/edu")
-		if err = internal.Mkdir(path); err != nil {
-			return fmt.Errorf("couldn't create config dir: %w", err)
+		err = createDefaultConfigFile("$HOME/.config/edu", "config.yml")
+		if err != nil {
+			return err
 		}
-		viper.SetConfigFile(filepath.Join(path, "config.yml"))
 	} else if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Fprintf(io.MultiWriter(os.Stderr, Logger), "Error: %v\n", err)
 	}
+
+	dir := filepath.Dir(viper.ConfigFileUsed())
+	Logger.Filename = filepath.Join(dir, "logs", "edu.log")
 
 	root.AddCommand(commands.All()...)
 	root.AddCommand(completionCmd)
-
 	err = root.Execute()
-	if err == nil {
-		return nil
+	if err != nil {
+		return errors.WithMessage(err, "Error")
 	}
-	errorMessage(err)
-	os.Exit(1)
-	return nil
+	return err
 }
 
 func init() {
@@ -108,6 +133,17 @@ var (
 	}
 )
 
+func createDefaultConfigFile(dir, file string) error {
+	path := os.ExpandEnv("$HOME/.config/edu")
+	if err := internal.Mkdir(path); err != nil {
+		return fmt.Errorf("couldn't create config dir: %w", err)
+	}
+	fullpath := filepath.Join(path, file)
+	log.Println("setting up config file at", fullpath)
+	viper.SetConfigFile(fullpath)
+	return nil
+}
+
 func errorMessage(err error) {
 	switch err.(type) {
 	case *canvas.AuthError:
@@ -121,7 +157,8 @@ func errorMessage(err error) {
 
 func errorHandler(e error) error {
 	if e != nil {
-		fmt.Println("Error: " + e.Error())
+		errmsg(e.Error())
+		fmt.Printf("%[1]T %[1]#v\n", e)
 		os.Exit(1)
 	}
 	return nil

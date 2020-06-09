@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"fmt"
 	"io"
 	"os"
 
@@ -9,11 +8,17 @@ import (
 	table "github.com/olekukonko/tablewriter"
 )
 
-func Stop(msg string) {
-	fmt.Fprintf(os.Stderr, "Error: %v\n", msg)
-	os.Exit(1)
+// Error is an error
+type Error struct {
+	Msg  string
+	Code int
 }
 
+func (e *Error) Error() string {
+	return e.Msg
+}
+
+// Mkdir creates a directory
 func Mkdir(dir string) error {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return os.MkdirAll(dir, 0775)
@@ -21,18 +26,22 @@ func Mkdir(dir string) error {
 	return nil
 }
 
-func GetCourses(all bool) ([]*canvas.Course, error) {
-	courses, err := canvas.Courses(canvas.ActiveCourses)
+// GetCourses gets all the courses
+func GetCourses(all bool, opts ...canvas.Option) ([]*canvas.Course, error) {
+	o := append(opts, canvas.ActiveCourses)
+	courses, err := canvas.Courses(o...)
 	if err != nil {
 		return nil, err
 	}
 	if all {
-		completed, err := canvas.Courses(canvas.CompletedCourses)
+		o = append(opts, canvas.CompletedCourses)
+		completed, err := canvas.Courses(o...)
 		if err != nil {
 			return courses, err
 		}
 		courses = append(courses, completed...)
-		pending, err := canvas.Courses(canvas.InvitedOrPendingCourses)
+		o = append(opts, canvas.InvitedOrPendingCourses)
+		pending, err := canvas.Courses(o...)
 		if err != nil {
 			return courses, err
 		}
@@ -41,6 +50,7 @@ func GetCourses(all bool) ([]*canvas.Course, error) {
 	return courses, nil
 }
 
+// NewTable creates a table with some default parameters
 func NewTable(r io.Writer) *table.Table {
 	t := table.NewWriter(r)
 	t.SetBorder(false)
@@ -52,6 +62,7 @@ func NewTable(r io.Writer) *table.Table {
 	return t
 }
 
+// SetTableHeader sets the table header and automatically manages header color.
 func SetTableHeader(t *table.Table, header []string) {
 	headercolors := make([]table.Colors, len(header))
 	for i := range header {

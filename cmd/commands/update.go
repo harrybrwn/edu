@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"github.com/harrybrwn/errs"
 	"github.com/harrybrwn/go-canvas"
 	"github.com/mitchellh/mapstructure"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -94,9 +96,11 @@ func (uc *updateCmd) run(cmd *cobra.Command, args []string) (err error) {
 	return nil
 }
 
+type downloadCourseFunc func(fullpath string, f *canvas.File, wg *sync.WaitGroup) error
+
 func (uc *updateCmd) downloadCourseFiles(c *canvas.Course, replacements []replacement) error {
 	defer uc.wg.Done()
-	return uc.courseFiles(c, func(fullpath, url string, wg *sync.WaitGroup) error {
+	return uc.courseFiles(c, func(fullpath string, file *canvas.File, wg *sync.WaitGroup) error {
 		defer wg.Done()
 		fullpath, err := doReplacements(replacements, fullpath, false)
 		if err != nil {
@@ -107,14 +111,14 @@ func (uc *updateCmd) downloadCourseFiles(c *canvas.Course, replacements []replac
 			return err
 		}
 		wg.Add(1)
-		go download(fullpath, url, uc.out, uc.err, wg)
+		go download(file, fullpath, uc.out, uc.err, wg)
 		return nil
 	})
 }
 
 func (uc *updateCmd) checkReplacementPats(c *canvas.Course, patterns []replacement) error {
 	defer uc.wg.Done()
-	return uc.courseFiles(c, func(fullpath, url string, wg *sync.WaitGroup) error {
+	return uc.courseFiles(c, func(fullpath string, _ *canvas.File, wg *sync.WaitGroup) error {
 		defer wg.Done()
 		result, err := doReplacements(patterns, fullpath, false)
 		if err != nil {
@@ -132,8 +136,8 @@ func (uc *updateCmd) checkReplacementPats(c *canvas.Course, patterns []replaceme
 	})
 }
 
-func downloadTo(
-	to io.WriterTo,
+func download(
+	file io.WriterTo,
 	filename string,
 	stdout, stderr io.Writer,
 	wg *sync.WaitGroup,
@@ -145,22 +149,23 @@ func downloadTo(
 		return nil
 	}
 	if err != nil {
-		return err
+		return errors.Wrap(err, "file error")
 	}
 	defer func() {
-		if e := osfile.Close(); e != nil {
+		if e := osfile.Close(); e != nil && err == nil {
 			err = e
 		}
 		if err != nil {
-			fmt.Fprintf(stderr, "Error: %s", err.Error())
+			log.Printf("Error: %s", err.Error())
 		}
+		fmt.Fprintf(stdout, "Downloaded %s\n", filename)
 	}()
-	fmt.Fprintf(stdout, "getting %s\n", filename)
-	_, err = to.WriteTo(osfile) // download the contents to the file
+	fmt.Fprintf(stdout, "Fetching %s\n", filename)
+	_, err = file.WriteTo(osfile) // download the contents to the file
 	return err
 }
 
-func download(file, url string, stdout, stderr io.Writer, wg *sync.WaitGroup) (err error) {
+func downloadURL(file, url string, stdout, stderr io.Writer, wg *sync.WaitGroup) (err error) {
 	defer func() {
 		if err != nil {
 			fmt.Fprintf(stderr, "Error: %s", err.Error())
@@ -193,7 +198,7 @@ func download(file, url string, stdout, stderr io.Writer, wg *sync.WaitGroup) (e
 
 func (uc *updateCmd) courseFiles(
 	c *canvas.Course,
-	fn func(fullpath, url string, wg *sync.WaitGroup) error,
+	fn downloadCourseFunc,
 ) error {
 	var dirmap = make(map[int]string)
 	for file := range c.Files(canvas.SortOpt(uc.sortBy...)) {
@@ -219,7 +224,7 @@ func (uc *updateCmd) courseFiles(
 		path := filepath.Join(uc.basedir, c.Name, rel)
 		fp := filepath.Join(path, file.Filename)
 		uc.wg.Add(1)
-		go fn(fp, file.URL, uc.wg)
+		go fn(fp, file, uc.wg)
 	}
 	return nil
 }
