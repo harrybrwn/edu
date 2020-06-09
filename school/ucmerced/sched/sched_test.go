@@ -7,7 +7,7 @@ import (
 )
 
 func TestGet(t *testing.T) {
-	sch, err := Get(2020, "spring")
+	sch, err := Get(2020, "spring", false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -29,7 +29,7 @@ func TestGet(t *testing.T) {
 			t.Error("should not be zero")
 		}
 	}
-	sch, err = BySubject(2020, "spring", "cse")
+	sch, err = BySubject(2020, "spring", "cse", false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -41,18 +41,18 @@ func TestGet(t *testing.T) {
 }
 
 func TestSched_Err(t *testing.T) {
-	_, err := Get(2020, "")
+	_, err := Get(2020, "", true)
 	if err == nil {
 		t.Error("expected an error for a bad term")
 	}
-	_, err = Get(1850, "spring")
+	_, err = Get(1850, "spring", false)
 	if err == nil {
 		t.Error("expeted an error for a rediculous year")
 	}
 }
 
 func Test(t *testing.T) {
-	s, err := BySubject(2020, "summer", "cse")
+	s, err := BySubject(2020, "summer", "cse", false)
 	if err != nil {
 		t.Error(err)
 	}

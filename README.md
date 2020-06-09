@@ -29,3 +29,6 @@ replacements:
 
 #### Token
 Token for the canvas api
+
+#### crns
+UC Merced specific feature. A list of CRNs that will be checked by the cli.

@@ -22,6 +22,16 @@ var terms = map[string]string{
 // Schedual is a map of courses by course CRN
 type Schedual map[int]*Course
 
+// Ordered will return a slice of courses that preserves
+// the original order.
+func (s *Schedual) Ordered() []*Course {
+	list := make([]*Course, len(*s))
+	for _, c := range *s {
+		list[c.order] = c
+	}
+	return list
+}
+
 // Course holds data for a specific
 // course that has been parsed from the courses table.
 type Course struct {
@@ -42,6 +52,7 @@ type Course struct {
 	ActiveEnrolled int
 
 	seats string
+	order int
 }
 
 // SeatsAvailible gets the number of seats availible for the course.
@@ -54,13 +65,13 @@ func (c *Course) SeatsAvailible() int {
 }
 
 // Get gets the schedual
-func Get(year int, term string) (Schedual, error) {
-	return BySubject(year, term, "")
+func Get(year int, term string, open bool) (Schedual, error) {
+	return BySubject(year, term, "", open)
 }
 
 // BySubject gets the schedual and only one subject given a subject code.
-func BySubject(year int, term, subject string) (Schedual, error) {
-	resp, err := getData(fmt.Sprintf("%d", year), term, strings.ToUpper(subject), false)
+func BySubject(year int, term, subject string, open bool) (Schedual, error) {
+	resp, err := getData(fmt.Sprintf("%d", year), term, strings.ToUpper(subject), open)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +86,10 @@ func BySubject(year int, term, subject string) (Schedual, error) {
 	selection := doc.Find(selector)
 	schedual := Schedual{}
 	keys := make([]string, 13)
-	var keyerr error
+	var (
+		keyerr error
+		order  = 0
+	)
 
 	selection.Each(func(i int, s *goquery.Selection) {
 		header := s.Find("th.ddlabel p small")
@@ -103,7 +117,9 @@ func BySubject(year int, term, subject string) (Schedual, error) {
 			// two different locations
 			return
 		}
+		course.order = order
 		schedual[course.CRN] = course
+		order++
 	})
 	return schedual, keyerr
 }
@@ -149,10 +165,17 @@ func getData(year, term, subject string, openclasses bool) (*http.Response, erro
 	if !ok {
 		return nil, fmt.Errorf("could not find term %s", term)
 	}
+	var open string
+	if openclasses {
+		open = "Y"
+	} else {
+		open = "N"
+	}
 	params := &url.Values{
 		"validterm":   {fmt.Sprintf("%s%s", year, termcode)},
-		"openclasses": {"N"},
-		"subjcode":    {"ALL"},
+		"openclasses": {open},
+		// "subjcode":    {"ALL"},
+		"subjcode": {subject},
 	}
 	if openclasses {
 		params.Set("openclasses", "Y")

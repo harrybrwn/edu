@@ -14,4 +14,4 @@ clean:
 	go clean
 	$(RM) -r dist
 
-.PHONY: build install clean dist
+.PHONY: build install clean

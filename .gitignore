@@ -1,6 +1,9 @@
 edu
 /vendor
 /dist
+
 *.txt
 *.json
+
+/scripts
 /upload.sh

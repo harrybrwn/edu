@@ -56,7 +56,6 @@ func newUpdateCmd() *cobra.Command {
 	flags.BoolVar(&uc.testPatters, "test-patterns", uc.testPatters, "test the replacement patterns from the config file")
 	flags.StringVar(&uc.basedir, "base-dir", uc.basedir, "base directory for file downloads")
 	flags.StringArrayVarP(&uc.sortBy, "sort-by", "s", uc.sortBy, "select the file sorting methods")
-
 	uc.cmd.RunE = uc.run
 	return uc.cmd
 }
@@ -69,16 +68,14 @@ func (uc *updateCmd) run(cmd *cobra.Command, args []string) (err error) {
 	if uc.verbose {
 		uc.out = os.Stdout
 	}
-
 	coursereps, replacements, err := getReplacements()
 	if err != nil {
 		return err
 	}
 
 	var fn = uc.downloadCourseFiles
-
 	if uc.testPatters {
-		fn = uc.checkReplacementPats
+		fn = uc.checkPatterns
 	}
 
 	uc.wg.Add(len(courses))
@@ -116,7 +113,7 @@ func (uc *updateCmd) downloadCourseFiles(c *canvas.Course, replacements []replac
 	})
 }
 
-func (uc *updateCmd) checkReplacementPats(c *canvas.Course, patterns []replacement) error {
+func (uc *updateCmd) checkPatterns(c *canvas.Course, patterns []replacement) error {
 	defer uc.wg.Done()
 	return uc.courseFiles(c, func(fullpath string, _ *canvas.File, wg *sync.WaitGroup) error {
 		defer wg.Done()

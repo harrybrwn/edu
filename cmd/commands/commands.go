@@ -24,10 +24,7 @@ func All() []*cobra.Command {
 }
 
 func newCoursesCmd() *cobra.Command {
-	var (
-		all     bool
-		pending bool
-	)
+	var all bool
 	c := &cobra.Command{
 		Use:     "courses",
 		Short:   "Show info on courses",
@@ -37,11 +34,7 @@ func newCoursesCmd() *cobra.Command {
 				err     error
 				courses []*canvas.Course
 			)
-			if pending {
-				courses, err = canvas.Courses(canvas.Opt("enrollment_state", "invited_or_pending"))
-			} else {
-				courses, err = internal.GetCourses(all)
-			}
+			courses, err = internal.GetCourses(all)
 			if err != nil {
 				return err
 			}
@@ -63,7 +56,6 @@ func newCoursesCmd() *cobra.Command {
 	}
 	flags := c.Flags()
 	flags.BoolVarP(&all, "all", "a", all, "show all courses (defaults to only active courses)")
-	flags.BoolVar(&pending, "pending", pending, "show all invited or pending courses")
 	return c
 }
 
