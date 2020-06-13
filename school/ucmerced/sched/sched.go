@@ -1,11 +1,13 @@
 package sched
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/harrybrwn/errs"
@@ -37,13 +39,15 @@ func (s *Schedual) Ordered() []*Course {
 type Course struct {
 	CRN      int
 	Fullcode string
-	Number   string
+	Number   int
 
-	Title        string
-	Units        int
-	Activity     string
-	Days         string
-	Time         string
+	Title    string
+	Units    int
+	Activity string
+	Days     []time.Weekday
+	Time     struct {
+		Start, End time.Time
+	}
 	BuildingRoom string
 	StartEnd     string
 	Instructor   string
@@ -51,14 +55,17 @@ type Course struct {
 	MaxEnrolled    int
 	ActiveEnrolled int
 
-	seats string
-	order int
+	timeStr string
+	seats   string
+	order   int
 }
 
 // SeatsAvailible gets the number of seats availible for the course.
 func (c *Course) SeatsAvailible() int {
 	seats, err := strconv.Atoi(c.seats)
 	if err != nil {
+		// if it is anything but a number
+		// then there are no seats availible
 		return 0
 	}
 	return seats
@@ -117,6 +124,9 @@ func BySubject(year int, term, subject string, open bool) (Schedual, error) {
 			// two different locations
 			return
 		}
+		if err != nil {
+			panic(err)
+		}
 		course.order = order
 		schedual[course.CRN] = course
 		order++
@@ -136,14 +146,14 @@ func newCourse(data []string) (*Course, error) {
 	if err != nil {
 		return nil, err
 	}
+	timeStr := data[6]
 	c := &Course{
 		CRN:            crn,
 		Fullcode:       data[1],
 		Title:          data[2],
 		Units:          units,
 		Activity:       data[4],
-		Days:           data[5],
-		Time:           data[6],
+		Days:           listDays(data[5]),
 		BuildingRoom:   data[7],
 		StartEnd:       data[8],
 		Instructor:     data[9],
@@ -151,11 +161,69 @@ func newCourse(data []string) (*Course, error) {
 		ActiveEnrolled: activenrl,
 		seats:          data[12],
 	}
+	c.Time.Start, c.Time.End, err = parseTime(timeStr)
+	if err != nil {
+		return nil, err
+	}
 	parts := strings.Split(c.Fullcode, "-")
 	if len(parts) >= 2 {
-		c.Number = parts[1]
+		end := parts[1][len(parts[1])-1]
+		if end < '0' || end > '9' {
+			parts[1] = trimInt(parts[1])
+		}
+		c.Number, err = strconv.Atoi(parts[1])
+		if err != nil {
+			return nil, err
+		}
 	}
 	return c, nil
+}
+
+func parseTime(ts string) (start time.Time, end time.Time, err error) {
+	if ts == "TBD-TBD" {
+		return
+	}
+	split := strings.Split(ts, "-")
+	if len(split) < 2 {
+		return start, end, errors.New("invalid time format")
+	}
+	start, e1 := time.Parse("3:04", split[0])
+	end, e2 := time.Parse("3:04pm", split[1])
+	if err = errs.Pair(e1, e2); err != nil {
+		return
+	}
+
+	diff := end.Hour() - start.Hour()
+	if end.Hour() >= 12 && diff >= 12 {
+		start = start.Add(12 * time.Hour)
+	}
+	return
+}
+
+func trimInt(s string) string {
+	num := make([]rune, 0, len(s))
+	for _, c := range s {
+		if c >= '0' && c <= '9' {
+			num = append(num, c)
+		}
+	}
+	return string(num)
+}
+
+var dayMap = map[rune]time.Weekday{
+	'M': time.Monday,
+	'T': time.Tuesday,
+	'W': time.Wednesday,
+	'R': time.Thursday,
+	'F': time.Friday,
+}
+
+func listDays(daystr string) (days []time.Weekday) {
+	days = make([]time.Weekday, len(daystr))
+	for i, char := range daystr {
+		days[i] = dayMap[char]
+	}
+	return days
 }
 
 var client http.Client
@@ -171,17 +239,13 @@ func getData(year, term, subject string, openclasses bool) (*http.Response, erro
 	} else {
 		open = "N"
 	}
+	if subject == "" {
+		subject = "ALL"
+	}
 	params := &url.Values{
 		"validterm":   {fmt.Sprintf("%s%s", year, termcode)},
 		"openclasses": {open},
-		// "subjcode":    {"ALL"},
-		"subjcode": {subject},
-	}
-	if openclasses {
-		params.Set("openclasses", "Y")
-	}
-	if subject != "" {
-		params.Set("subjcode", strings.ToUpper(subject))
+		"subjcode":    {strings.ToUpper(subject)},
 	}
 	req := &http.Request{
 		Method: "GET",

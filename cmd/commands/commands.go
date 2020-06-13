@@ -6,6 +6,7 @@ import (
 	"os/exec"
 
 	"github.com/harrybrwn/edu/cmd/internal"
+	"github.com/harrybrwn/edu/cmd/internal/opts"
 	"github.com/harrybrwn/errs"
 	"github.com/harrybrwn/go-canvas"
 	"github.com/spf13/cobra"
@@ -13,13 +14,14 @@ import (
 )
 
 // All returns all the commands.
-func All() []*cobra.Command {
+func All(globals *opts.Global) []*cobra.Command {
 	return []*cobra.Command{
 		newCoursesCmd(),
 		newConfigCmd(),
 		canvasCmd,
 		newUpdateCmd(),
-		newRegistrationCmd(),
+		newRegistrationCmd(globals),
+		newTextCmd(),
 	}
 }
 

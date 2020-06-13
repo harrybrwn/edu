@@ -9,6 +9,7 @@ import (
 
 	"github.com/harrybrwn/edu/cmd/commands"
 	"github.com/harrybrwn/edu/cmd/internal"
+	"github.com/harrybrwn/edu/cmd/internal/opts"
 	"github.com/harrybrwn/errs"
 	"github.com/harrybrwn/go-canvas"
 	"github.com/pkg/errors"
@@ -57,7 +58,10 @@ func Execute() (err error) {
 	dir := filepath.Dir(viper.ConfigFileUsed())
 	Logger.Filename = filepath.Join(dir, "logs", "edu.log")
 
-	root.AddCommand(commands.All()...)
+	globalFlags := opts.Global{}
+	globalFlags.AddToFlagSet(root.PersistentFlags())
+
+	root.AddCommand(commands.All(&globalFlags)...)
 	root.AddCommand(completionCmd)
 	err = root.Execute()
 	if err != nil {
@@ -80,6 +84,8 @@ func init() {
 	viper.SetEnvPrefix("edu")
 	viper.BindEnv("host")
 	viper.BindEnv("canvas_token", "CANVAS_TOKEN")
+	viper.BindEnv("twilio_sid", "TWILIO_SID")
+	viper.BindEnv("twilio_token", "TWILIO_TOKEN")
 
 	viper.SetDefault("editor", os.Getenv("EDITOR"))
 	viper.SetDefault("basedir", "$HOME/.edu/files")
@@ -101,7 +107,11 @@ var (
 				canvas.SetToken(os.ExpandEnv(token))
 			} else {
 				viper.Set("token", viper.GetString("canvas_token"))
-				canvas.SetToken(os.ExpandEnv(viper.GetString("token")))
+				token = os.ExpandEnv(viper.GetString("token"))
+				canvas.SetToken(token)
+			}
+			if token == "" {
+				log.Println("no canvas api token")
 			}
 			canvas.ConcurrentErrorHandler = errorHandler
 		},

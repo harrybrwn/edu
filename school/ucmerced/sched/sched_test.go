@@ -1,8 +1,6 @@
 package sched
 
 import (
-	"fmt"
-	"strings"
 	"testing"
 )
 
@@ -33,11 +31,6 @@ func TestGet(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	for _, course := range sch {
-		if !strings.HasPrefix(course.Number, "CSE") {
-			t.Error("should be a cse course")
-		}
-	}
 }
 
 func TestSched_Err(t *testing.T) {
@@ -52,11 +45,40 @@ func TestSched_Err(t *testing.T) {
 }
 
 func Test(t *testing.T) {
-	s, err := BySubject(2020, "summer", "cse", false)
+	sc, err := Get(2020, "fall", true)
 	if err != nil {
 		t.Error(err)
 	}
-	for _, c := range s {
-		fmt.Println(c.Title)
+	for _, c := range sc {
+		if c.Days[0] == 194 {
+			continue
+		}
+		// fmt.Println(c.Days)
+	}
+}
+
+func TestParseTime(t *testing.T) {
+	testcases := []struct {
+		str        string
+		start, end int
+	}{
+		{str: "11:30-2:15pm", start: 11, end: 14},
+		{str: "10:30-1:20pm", start: 10, end: 13},
+		{str: "5:30-7:20pm", start: 17, end: 19},
+		{str: "9:30-11:20am", start: 9, end: 11},
+		{str: "9:00-12:00am", start: 9, end: 0},
+		{str: "TBD-TBD", start: 0, end: 0},
+	}
+	for _, tc := range testcases {
+		start, end, err := parseTime(tc.str)
+		if err != nil {
+			t.Error(err)
+		}
+		if start.Hour() != tc.start {
+			t.Errorf("wrong starting hour %d; want %d", start.Hour(), tc.start)
+		}
+		if end.Hour() != tc.end {
+			t.Errorf("wrong ending hour %d; want %d", end.Hour(), tc.end)
+		}
 	}
 }
