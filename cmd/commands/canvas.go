@@ -1,8 +1,11 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"path"
+	"path/filepath"
 
 	"github.com/harrybrwn/edu/cmd/internal"
 	"github.com/harrybrwn/go-canvas"
@@ -50,6 +53,7 @@ func init() {
 	canvasCmd.AddCommand(
 		newFilesCmd(),
 		dueCmd,
+		newUploadCmd(),
 	)
 }
 
@@ -68,7 +72,7 @@ var (
 				return err
 			}
 			tab := internal.NewTable(cmd.OutOrStdout())
-			internal.SetTableHeader(tab, []string{"name", "due"})
+			internal.SetTableHeader(tab, []string{"name", "due"}, true)
 			for _, course := range courses {
 				for as := range course.Assignments() {
 					tab.Append([]string{as.Name, as.DueAt.String()})
@@ -77,12 +81,6 @@ var (
 			tab.Render()
 			return nil
 		},
-	}
-
-	testCmd = &cobra.Command{
-		Use:    "test",
-		Hidden: false,
-		RunE:   func(cmd *cobra.Command, args []string) error { return nil },
 	}
 )
 
@@ -123,4 +121,63 @@ func newFilesCmd() *cobra.Command {
 	flags.StringArrayVarP(&sortby, "sortyby", "s", sortby, "how the files should be sorted")
 	ff.addToFlagSet(flags)
 	return c
+}
+
+func newUploadCmd() *cobra.Command {
+	var (
+		file       string
+		folderPath string
+		uploadAs   string
+	)
+	c := &cobra.Command{
+		Use:   "upload",
+		Short: "Upload a file to canvas user account.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 && file == "" {
+				file = args[0]
+			}
+			if file == "" {
+				return errors.New("no filename given")
+			}
+			if folderPath != "" {
+				uploadAs = path.Join(folderPath, file)
+			}
+			if uploadAs == "" {
+				_, filename := filepath.Split(file)
+				uploadAs = "/" + filename
+			}
+			return upload(file, uploadAs)
+		},
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return args, cobra.ShellCompDirectiveDefault
+		},
+	}
+	if err := c.MarkZshCompPositionalArgumentFile(1, "*"); err != nil {
+		fmt.Fprintf(os.Stderr, "Completion error: %v", err)
+	}
+	flags := c.Flags()
+	flags.StringVarP(&file, "file", "f", "", "give a filename for the file to upload")
+	flags.StringVarP(&uploadAs, "upload-as", "u", "", "rename the file being uploaded")
+	flags.StringVarP(&folderPath, "folder", "d", "", "set the folder path to upload the file to")
+	return c
+}
+
+func upload(filename, uploadname string) (err error) {
+	dir, uploadname := filepath.Split(uploadname)
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		// set the return value in case of close error
+		if e := file.Close(); e != nil {
+			err = e
+		}
+	}()
+	var opts []canvas.Option
+	if dir != "" {
+		opts = append(opts, canvas.Opt("parent_folder_path", dir))
+	}
+	_, err = canvas.UploadFile(uploadname, file, opts...)
+	return err
 }

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/gen2brain/beeep"
 	"github.com/harrybrwn/edu/cmd/commands"
 	"github.com/harrybrwn/edu/cmd/internal"
 	"github.com/harrybrwn/edu/cmd/internal/opts"
@@ -62,7 +63,7 @@ func Execute() (err error) {
 	globalFlags.AddToFlagSet(root.PersistentFlags())
 
 	root.AddCommand(commands.All(&globalFlags)...)
-	root.AddCommand(completionCmd)
+	root.AddCommand(completionCmd, testCmd)
 	err = root.Execute()
 	if err != nil {
 		return errors.WithMessage(err, "Error")
@@ -89,6 +90,7 @@ func init() {
 
 	viper.SetDefault("editor", os.Getenv("EDITOR"))
 	viper.SetDefault("basedir", "$HOME/.edu/files")
+	viper.SetDefault("notifications", true)
 }
 
 var (
@@ -140,6 +142,17 @@ var (
 		},
 		ValidArgs: []string{"zsh", "bash", "ps", "powershell", "fish"},
 		Aliases:   []string{"comp"},
+	}
+
+	testCmd = &cobra.Command{
+		Use:    "test",
+		Hidden: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) < 1 {
+				return errors.New("no arguments")
+			}
+			return beeep.Notify("edu", args[0], "")
+		},
 	}
 )
 

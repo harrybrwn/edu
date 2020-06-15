@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gen2brain/beeep"
 	"github.com/harrybrwn/edu/cmd/internal"
 	"github.com/harrybrwn/edu/cmd/internal/opts"
 	"github.com/harrybrwn/edu/school/ucmerced/sched"
@@ -82,11 +83,7 @@ registration information.`,
 			}
 
 			tab := internal.NewTable(cmd.OutOrStdout())
-			if sflags.NoColor {
-				tab.SetHeader(regHeader)
-			} else {
-				internal.SetTableHeader(tab, regHeader)
-			}
+			internal.SetTableHeader(tab, regHeader, sflags.NoColor)
 			tab.SetAutoWrapText(false)
 			for _, c := range schedual.Ordered() {
 				if num != 0 && c.Number != num {
@@ -124,11 +121,7 @@ func newCheckCRNCmd(sflags *schedualFlags) *cobra.Command {
 
 			tab := internal.NewTable(cmd.OutOrStdout())
 			header := []string{"crn", "code", "open", "type", "time", "days"}
-			if sflags.NoColor {
-				tab.SetHeader(header)
-			} else {
-				internal.SetTableHeader(tab, header)
-			}
+			internal.SetTableHeader(tab, header, sflags.NoColor)
 			tab.SetAutoWrapText(false)
 			for _, crn := range crns {
 				course, ok := schedual[crn]
@@ -146,6 +139,28 @@ func newCheckCRNCmd(sflags *schedualFlags) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&subject, "subject", "", "check the CRNs for a specific subject")
 	return cmd
+}
+
+func checkCRNList(crns []int, subject string, sflags *schedualFlags) error {
+	schedual, err := sched.BySubject(sflags.year, sflags.term, subject, true)
+	if err != nil {
+		return err
+	}
+	openCrns := make([]int, 0)
+	for _, crn := range crns {
+		_, ok := schedual[crn]
+		if !ok {
+			continue
+		}
+		openCrns = append(openCrns, crn)
+	}
+	if len(openCrns) == 0 {
+		return &internal.Error{Msg: fmt.Sprintf("could not find %v in schedual", crns), Code: 1}
+	}
+	if viper.GetBool("notifications") {
+		return beeep.Notify("Found Open Courses", fmt.Sprintf("Open crns: %v", openCrns), "")
+	}
+	return nil
 }
 
 func courseRow(c *sched.Course, title bool) []string {

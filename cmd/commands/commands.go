@@ -48,7 +48,7 @@ func newCoursesCmd() *cobra.Command {
 			}
 			tab := internal.NewTable(cmd.OutOrStderr())
 			header := []string{"id", "name", "uuid", "code", "ends"}
-			internal.SetTableHeader(tab, header)
+			internal.SetTableHeader(tab, header, true)
 			for _, c := range courses {
 				tab.Append([]string{fmt.Sprintf("%d", c.ID), c.Name, c.UUID, c.CourseCode, c.EndAt.Format("01/02/06")})
 			}

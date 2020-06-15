@@ -63,11 +63,13 @@ func NewTable(r io.Writer) *table.Table {
 }
 
 // SetTableHeader sets the table header and automatically manages header color.
-func SetTableHeader(t *table.Table, header []string) {
-	headercolors := make([]table.Colors, len(header))
-	for i := range header {
-		headercolors[i] = table.Colors{table.FgCyanColor}
-	}
+func SetTableHeader(t *table.Table, header []string, color bool) {
 	t.SetHeader(header)
-	t.SetHeaderColor(headercolors...)
+	if color {
+		headercolors := make([]table.Colors, len(header))
+		for i := range header {
+			headercolors[i] = table.Colors{table.FgCyanColor}
+		}
+		t.SetHeaderColor(headercolors...)
+	}
 }
