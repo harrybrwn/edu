@@ -61,7 +61,18 @@ type Course struct {
 }
 
 // SeatsAvailible gets the number of seats availible for the course.
-func (c *Course) SeatsAvailible() int {
+func (c *Course) _SeatsAvailible() int {
+	seats, err := strconv.Atoi(c.seats)
+	if err != nil {
+		// if it is anything but a number
+		// then there are no seats availible
+		return 0
+	}
+	return seats
+}
+
+// SeatsOpen gets the number of seats availible for the course.
+func (c *Course) SeatsOpen() int {
 	seats, err := strconv.Atoi(c.seats)
 	if err != nil {
 		// if it is anything but a number

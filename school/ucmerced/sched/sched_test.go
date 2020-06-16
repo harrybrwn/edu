@@ -20,10 +20,10 @@ func TestGet(t *testing.T) {
 			t.Error("key does not match value")
 		}
 		if course.seats == "Closed" {
-			if course.SeatsAvailible() != 0 {
+			if course.SeatsOpen() != 0 {
 				t.Error("should be zero")
 			}
-		} else if course.SeatsAvailible() == 0 {
+		} else if course.SeatsOpen() == 0 {
 			t.Error("should not be zero")
 		}
 	}

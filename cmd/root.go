@@ -23,7 +23,7 @@ var version string
 
 // Logger for the cmd package
 var Logger = &lumberjack.Logger{
-	Filename:   "",
+	Filename:   filepath.Join(os.TempDir(), "edu.log"),
 	MaxSize:    25,  // megabytes
 	MaxBackups: 10,  // number of spare files
 	MaxAge:     365, //days
@@ -45,7 +45,6 @@ func Stop(message interface{}) {
 // Execute will execute the root comand on the cli
 func Execute() (err error) {
 	log.SetOutput(Logger)
-
 	err = viper.ReadInConfig()
 	if _, ok := err.(viper.ConfigFileNotFoundError); err != nil && ok {
 		err = createDefaultConfigFile("$HOME/.config/edu", "config.yml")
@@ -56,8 +55,10 @@ func Execute() (err error) {
 		fmt.Fprintf(io.MultiWriter(os.Stderr, Logger), "Error: %v\n", err)
 	}
 
-	dir := filepath.Dir(viper.ConfigFileUsed())
-	Logger.Filename = filepath.Join(dir, "logs", "edu.log")
+	configfile := viper.ConfigFileUsed()
+	if configfile != "" {
+		Logger.Filename = filepath.Join(filepath.Dir(configfile), "logs", "edu.log")
+	}
 
 	globalFlags := opts.Global{}
 	globalFlags.AddToFlagSet(root.PersistentFlags())
@@ -91,14 +92,17 @@ func init() {
 	viper.SetDefault("editor", os.Getenv("EDITOR"))
 	viper.SetDefault("basedir", "$HOME/.edu/files")
 	viper.SetDefault("notifications", true)
+	viper.SetDefault("watch.duration", "12h")
+
+	beeep.DefaultDuration = 800
 }
 
 var (
 	root = &cobra.Command{
-		Use:           "edu",
-		SilenceErrors: true,
-		SilenceUsage:  true,
-		Version:       version,
+		Use: "edu",
+		// SilenceErrors: true,
+		// SilenceUsage:  true,
+		Version: version,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			host := viper.GetString("host")
 			if host != "" {

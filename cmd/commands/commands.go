@@ -16,16 +16,17 @@ import (
 // All returns all the commands.
 func All(globals *opts.Global) []*cobra.Command {
 	return []*cobra.Command{
-		newCoursesCmd(),
+		newCoursesCmd(globals),
 		newConfigCmd(),
 		canvasCmd,
 		newUpdateCmd(),
 		newRegistrationCmd(globals),
 		newTextCmd(),
+		genServiceCmd(),
 	}
 }
 
-func newCoursesCmd() *cobra.Command {
+func newCoursesCmd(opts *opts.Global) *cobra.Command {
 	var all bool
 	c := &cobra.Command{
 		Use:     "courses",
@@ -40,15 +41,9 @@ func newCoursesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			var namelen = 1
-			for _, course := range courses {
-				if len(course.Name) > namelen {
-					namelen = len(course.Name)
-				}
-			}
 			tab := internal.NewTable(cmd.OutOrStderr())
 			header := []string{"id", "name", "uuid", "code", "ends"}
-			internal.SetTableHeader(tab, header, true)
+			internal.SetTableHeader(tab, header, !opts.NoColor)
 			for _, c := range courses {
 				tab.Append([]string{fmt.Sprintf("%d", c.ID), c.Name, c.UUID, c.CourseCode, c.EndAt.Format("01/02/06")})
 			}

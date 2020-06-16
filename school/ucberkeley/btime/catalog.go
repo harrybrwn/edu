@@ -99,7 +99,6 @@ func (rs Results) Len() int {
 }
 
 func (rs Results) Less(i, j int) bool {
-	// return rs[i].GradeAverage < rs[i].GradeAverage
 	return rs[i].GradeAverage > rs[i].GradeAverage
 }
 

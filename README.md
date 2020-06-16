@@ -30,5 +30,12 @@ replacements:
 #### Token
 Token for the canvas api
 
-#### crns
-UC Merced specific feature. A list of CRNs that will be checked by the cli.
+#### watch
+The `watch` config field is an object that houses configuration data for the `edu watch` command.
+* duration - tells the `watch` command how often to repeat (default is '12h')
+* crns - an array of crn IDs that will be watched
+```yaml
+watch:
+  duration: '1h35m100ms'
+  crns: [123, 234 ,345 ,456 ,567]
+```

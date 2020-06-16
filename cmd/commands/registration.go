@@ -1,7 +1,9 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -83,7 +85,7 @@ registration information.`,
 			}
 
 			tab := internal.NewTable(cmd.OutOrStdout())
-			internal.SetTableHeader(tab, regHeader, sflags.NoColor)
+			internal.SetTableHeader(tab, regHeader, !sflags.NoColor)
 			tab.SetAutoWrapText(false)
 			for _, c := range schedual.Ordered() {
 				if num != 0 && c.Number != num {
@@ -99,7 +101,7 @@ registration information.`,
 		},
 	}
 	sflags.install(c.PersistentFlags())
-	c.AddCommand(newCheckCRNCmd(&sflags))
+	c.AddCommand(newCheckCRNCmd(&sflags), newWatchCmd(&sflags))
 	return c
 }
 
@@ -113,7 +115,7 @@ func newCheckCRNCmd(sflags *schedualFlags) *cobra.Command {
 				return err
 			}
 			crns := viper.GetIntSlice("crns")
-			crnargs, err := stoiArr(args)
+			crnargs, err := stroiArr(args)
 			if err != nil {
 				return err
 			}
@@ -121,7 +123,7 @@ func newCheckCRNCmd(sflags *schedualFlags) *cobra.Command {
 
 			tab := internal.NewTable(cmd.OutOrStdout())
 			header := []string{"crn", "code", "open", "type", "time", "days"}
-			internal.SetTableHeader(tab, header, sflags.NoColor)
+			internal.SetTableHeader(tab, header, !sflags.NoColor)
 			tab.SetAutoWrapText(false)
 			for _, crn := range crns {
 				course, ok := schedual[crn]
@@ -141,6 +143,91 @@ func newCheckCRNCmd(sflags *schedualFlags) *cobra.Command {
 	return cmd
 }
 
+type watcher interface {
+	Watch() error
+}
+
+type watcherFunc func() error
+
+func (wf watcherFunc) Watch() error {
+	return wf()
+}
+
+type crnWatcher struct {
+	crns    []int
+	subject string
+	flags   *schedualFlags
+	verbose bool
+}
+
+func (cw *crnWatcher) Watch() error {
+	err := checkCRNList(cw.crns, cw.subject, cw.flags)
+	if err != nil {
+		if cw.verbose {
+			fmt.Println(err)
+		}
+		return err
+	}
+	return nil
+}
+
+func newWatchCmd(sflags *schedualFlags) *cobra.Command {
+	var (
+		subject string
+		verbose bool
+	)
+	c := &cobra.Command{
+		Use:   "watch",
+		Short: "Watch for availability changes in a list of CRNs",
+		Long: "Watch for availability changes in a list of CRNs." +
+			"",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			crns, err := stroiArr(args)
+			if err != nil {
+				return err
+			}
+			crns = append(crns, viper.GetIntSlice("watch.crns")...)
+			if len(crns) < 1 {
+				return errors.New("no crns to check")
+			}
+
+			var duration time.Duration
+			duration, err = time.ParseDuration(viper.GetString("watch.duration"))
+			if err != nil {
+				return err
+			}
+
+			var watches = []watcher{
+				&crnWatcher{
+					crns:    crns,
+					subject: subject,
+					flags:   sflags,
+					verbose: verbose,
+				},
+			}
+			if viper.GetBool("watch.files") {
+				watches = append(watches, watcherFunc(func() error {
+					return nil
+				}))
+			}
+
+			for {
+				for _, wt := range watches {
+					go func(wt watcher) {
+						if err := wt.Watch(); err != nil {
+							log.Printf("Watch Error: %s", err.Error())
+						}
+					}(wt)
+				}
+				time.Sleep(duration)
+			}
+		},
+	}
+	c.Flags().BoolVarP(&verbose, "verbose", "v", verbose, "print out any errors")
+	c.Flags().StringVar(&subject, "subject", "", "check the CRNs for a specific subject")
+	return c
+}
+
 func checkCRNList(crns []int, subject string, sflags *schedualFlags) error {
 	schedual, err := sched.BySubject(sflags.year, sflags.term, subject, true)
 	if err != nil {
@@ -157,8 +244,13 @@ func checkCRNList(crns []int, subject string, sflags *schedualFlags) error {
 	if len(openCrns) == 0 {
 		return &internal.Error{Msg: fmt.Sprintf("could not find %v in schedual", crns), Code: 1}
 	}
+	msg := "Open crns:\n"
+	for _, crn := range openCrns {
+		msg += fmt.Sprintf("%d\n", crn)
+	}
+
 	if viper.GetBool("notifications") {
-		return beeep.Notify("Found Open Courses", fmt.Sprintf("Open crns: %v", openCrns), "")
+		return beeep.Notify("Found Open Courses", msg, "")
 	}
 	return nil
 }
@@ -175,7 +267,7 @@ func courseRow(c *sched.Course, title bool) []string {
 		return []string{
 			strconv.Itoa(c.CRN),
 			c.Fullcode,
-			strconv.Itoa(c.SeatsAvailible()),
+			strconv.Itoa(c.SeatsOpen()),
 			c.Activity,
 			cleanTitle(c.Title),
 			timeStr,
@@ -185,7 +277,7 @@ func courseRow(c *sched.Course, title bool) []string {
 	return []string{
 		strconv.Itoa(c.CRN),
 		c.Fullcode,
-		strconv.Itoa(c.SeatsAvailible()),
+		strconv.Itoa(c.SeatsOpen()),
 		c.Activity,
 		timeStr,
 		days,
@@ -203,7 +295,7 @@ func cleanTitle(title string) string {
 	return title
 }
 
-func stoiArr(arr []string) (ints []int, err error) {
+func stroiArr(arr []string) (ints []int, err error) {
 	ints = make([]int, len(arr))
 	for i, n := range arr {
 		ints[i], err = strconv.Atoi(n)

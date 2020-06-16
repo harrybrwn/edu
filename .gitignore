@@ -1,6 +1,7 @@
 edu
 /vendor
 /dist
+/misc
 
 *.txt
 *.json
