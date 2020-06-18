@@ -11,6 +11,7 @@ dist:
 	goreleaser releaser --skip-publish --snapshot
 
 service: misc/systemd/edu.service
+	@[ ! -d misc/systemd ] && mkdir -p misc/systemd
 	@if systemctl status edu > /dev/null 1>&2; then systemctl stop edu; fi
 	install $< /etc/systemd/system
 	systemctl enable edu
@@ -19,7 +20,6 @@ misc/systemd/edu.service:
 	go build
 	./edu gen-service -f $<
 	go clean
-
 
 clean:
 	go clean

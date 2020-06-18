@@ -12,6 +12,7 @@ import (
 	"github.com/gen2brain/beeep"
 	"github.com/harrybrwn/edu/cmd/internal"
 	"github.com/harrybrwn/edu/cmd/internal/opts"
+	"github.com/harrybrwn/edu/pkg/info"
 	"github.com/harrybrwn/edu/school/ucmerced/sched"
 	"github.com/harrybrwn/errs"
 	"github.com/mitchellh/mapstructure"
@@ -210,14 +211,12 @@ func newWatchCmd(sflags *schedualFlags) *cobra.Command {
 					return nil
 				}))
 			}
-
+			if !viper.GetBool("no_runtime_info") {
+				go info.Intrp()
+			}
 			for {
 				for _, wt := range watches {
-					go func(wt watcher) {
-						if err := wt.Watch(); err != nil {
-							log.Printf("Watch Error: %s", err.Error())
-						}
-					}(wt)
+					go runwatch(wt)
 				}
 				time.Sleep(duration)
 			}
@@ -226,6 +225,12 @@ func newWatchCmd(sflags *schedualFlags) *cobra.Command {
 	c.Flags().BoolVarP(&verbose, "verbose", "v", verbose, "print out any errors")
 	c.Flags().StringVar(&subject, "subject", "", "check the CRNs for a specific subject")
 	return c
+}
+
+func runwatch(wt watcher) {
+	if err := wt.Watch(); err != nil {
+		log.Printf("Watch Error: %s", err.Error())
+	}
 }
 
 func checkCRNList(crns []int, subject string, sflags *schedualFlags) error {
