@@ -16,4 +16,4 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
 
-replace github.com/harrybrwn/go-canvas => ../go-canvas
+replace github.com/harrybrwn/go-canvas => ../../pkg/go-canvas

@@ -185,7 +185,6 @@ func errorMessage(err error) {
 func errorHandler(e error) error {
 	if e != nil {
 		errmsg(e.Error())
-		fmt.Printf("%[1]T %[1]#v\n", e)
 		os.Exit(1)
 	}
 	return nil
