@@ -19,12 +19,12 @@ func testCatalog() Catalog {
 }
 
 func Test(t *testing.T) {
-	schedual := testCatalog()
-	all := schedual.AllItems()
+	schedule := testCatalog()
+	all := schedule.AllItems()
 	if len(all) < 1 {
 		t.Error("should not be empty")
 	}
-	res, err := schedual.DefaultFilter()
+	res, err := schedule.DefaultFilter()
 	if err != nil {
 		t.Error(err)
 	}

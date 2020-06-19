@@ -20,9 +20,9 @@ type fileFinder struct {
 }
 
 func (ff *fileFinder) flagset() *pflag.FlagSet {
-	fset := pflag.NewFlagSet("", pflag.ExitOnError)
-	ff.addToFlagSet(fset)
-	return fset
+	flagset := pflag.NewFlagSet("", pflag.ExitOnError)
+	ff.addToFlagSet(flagset)
+	return flagset
 }
 
 func (ff *fileFinder) getCourses() ([]*canvas.Course, error) {
@@ -43,10 +43,10 @@ func (ff *fileFinder) options() (opts []canvas.Option) {
 	return opts
 }
 
-func (ff *fileFinder) addToFlagSet(fset *pflag.FlagSet) {
-	fset.BoolVarP(&ff.all, "all", "a", ff.all, "query files from all courses")
-	fset.StringVarP(&ff.contentType, "content-type", "c", "", "filter out files by content type (ex. application/pdf)")
-	fset.StringVar(&ff.search, "search", "", "search for files by name")
+func (ff *fileFinder) addToFlagSet(flagset *pflag.FlagSet) {
+	flagset.BoolVarP(&ff.all, "all", "a", ff.all, "query files from all courses")
+	flagset.StringVarP(&ff.contentType, "content-type", "c", "", "filter out files by content type (ex. application/pdf)")
+	flagset.StringVar(&ff.search, "search", "", "search for files by name")
 }
 
 func init() {

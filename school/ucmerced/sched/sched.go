@@ -21,12 +21,12 @@ var terms = map[string]string{
 	"fall":   "30",
 }
 
-// Schedual is a map of courses by course CRN
-type Schedual map[int]*Course
+// Schedule is a map of courses by course CRN
+type Schedule map[int]*Course
 
 // Ordered will return a slice of courses that preserves
 // the original order.
-func (s *Schedual) Ordered() []*Course {
+func (s *Schedule) Ordered() []*Course {
 	list := make([]*Course, len(*s))
 	for _, c := range *s {
 		list[c.order] = c
@@ -60,24 +60,24 @@ type Course struct {
 	order   int
 }
 
-// SeatsOpen gets the number of seats availible for the course.
+// SeatsOpen gets the number of seats available for the course.
 func (c *Course) SeatsOpen() int {
 	seats, err := strconv.Atoi(c.seats)
 	if err != nil {
 		// if it is anything but a number
-		// then there are no seats availible
+		// then there are no seats available
 		return 0
 	}
 	return seats
 }
 
-// Get gets the schedual
-func Get(year int, term string, open bool) (Schedual, error) {
+// Get gets the schedule
+func Get(year int, term string, open bool) (Schedule, error) {
 	return BySubject(year, term, "", open)
 }
 
-// BySubject gets the schedual and only one subject given a subject code.
-func BySubject(year int, term, subject string, open bool) (Schedual, error) {
+// BySubject gets the schedule and only one subject given a subject code.
+func BySubject(year int, term, subject string, open bool) (Schedule, error) {
 	resp, err := getData(fmt.Sprintf("%d", year), term, strings.ToUpper(subject), open)
 	if err != nil {
 		return nil, err
@@ -91,7 +91,7 @@ func BySubject(year int, term, subject string, open bool) (Schedual, error) {
 		return nil, err
 	}
 	selection := doc.Find(selector)
-	schedual := Schedual{}
+	schedual := Schedule{}
 	keys := make([]string, 13)
 	var (
 		keyerr error

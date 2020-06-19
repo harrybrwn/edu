@@ -5,12 +5,14 @@ import (
 	"strings"
 )
 
+// Replacement is a regex pattern replacement
 type Replacement struct {
 	Pattern     string
 	Replacement string
 	Lower       bool
 }
 
+// Replace will perform a replacement
 func (r Replacement) Replace(path string) (result string, err error) {
 	result = path
 	pat, err := regexp.Compile(r.Pattern)
@@ -25,6 +27,7 @@ func (r Replacement) Replace(path string) (result string, err error) {
 	return pat.ReplaceAllString(result, r.Replacement), nil
 }
 
+// DoReplacements return the result of a series of replacements
 func DoReplacements(patterns []Replacement, fullpath string) (result string, err error) {
 	result = fullpath
 	for _, rep := range patterns {

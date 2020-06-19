@@ -21,15 +21,15 @@ import (
 	"github.com/spf13/viper"
 )
 
-type schedualFlags struct {
+type scheduleFlags struct {
 	*opts.Global
-	term   string
-	year   int
-	open   bool
-	colums []string
+	term    string
+	year    int
+	open    bool
+	columns []string
 }
 
-func (sf *schedualFlags) install(fset *pflag.FlagSet) {
+func (sf *scheduleFlags) install(fset *pflag.FlagSet) {
 	fset.StringVar(&sf.term, "term", sf.term, "specify the term (spring|summer|fall)")
 	fset.IntVar(&sf.year, "year", sf.year, "specify the year for registration")
 	fset.BoolVar(&sf.open, "open", sf.open, "only get classes that have seats open")
@@ -46,7 +46,7 @@ var regHeader = []string{
 }
 
 func newRegistrationCmd(globals *opts.Global) *cobra.Command {
-	var sflags = schedualFlags{
+	var sflags = scheduleFlags{
 		term:   viper.GetString("registration.term"),
 		year:   viper.GetInt("registration.year"),
 		Global: globals,
@@ -77,7 +77,7 @@ registration information.`,
 					return err
 				}
 			}
-			schedual, err := sched.BySubject(
+			schedule, err := sched.BySubject(
 				sflags.year, sflags.term,
 				subj, sflags.open,
 			) // still works with an empty subj
@@ -88,7 +88,7 @@ registration information.`,
 			tab := internal.NewTable(cmd.OutOrStdout())
 			internal.SetTableHeader(tab, regHeader, !sflags.NoColor)
 			tab.SetAutoWrapText(false)
-			for _, c := range schedual.Ordered() {
+			for _, c := range schedule.Ordered() {
 				if num != 0 && c.Number != num {
 					continue
 				}
@@ -106,12 +106,12 @@ registration information.`,
 	return c
 }
 
-func newCheckCRNCmd(sflags *schedualFlags) *cobra.Command {
+func newCheckCRNCmd(sflags *scheduleFlags) *cobra.Command {
 	var subject string
 	cmd := &cobra.Command{
 		Use: "check-crns",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			schedual, err := sched.BySubject(sflags.year, sflags.term, subject, true)
+			schedule, err := sched.BySubject(sflags.year, sflags.term, subject, true)
 			if err != nil {
 				return err
 			}
@@ -127,14 +127,14 @@ func newCheckCRNCmd(sflags *schedualFlags) *cobra.Command {
 			internal.SetTableHeader(tab, header, !sflags.NoColor)
 			tab.SetAutoWrapText(false)
 			for _, crn := range crns {
-				course, ok := schedual[crn]
+				course, ok := schedule[crn]
 				if !ok {
 					continue
 				}
 				tab.Append(courseRow(course, false))
 			}
 			if tab.NumLines() == 0 {
-				return &internal.Error{Msg: fmt.Sprintf("could not find %v in schedual", crns), Code: 1}
+				return &internal.Error{Msg: fmt.Sprintf("could not find %v in schedule", crns), Code: 1}
 			}
 			tab.Render()
 			return nil
@@ -157,7 +157,7 @@ func (wf watcherFunc) Watch() error {
 type crnWatcher struct {
 	crns    []int
 	subject string
-	flags   *schedualFlags
+	flags   *scheduleFlags
 	verbose bool
 }
 
@@ -172,7 +172,7 @@ func (cw *crnWatcher) Watch() error {
 	return nil
 }
 
-func newWatchCmd(sflags *schedualFlags) *cobra.Command {
+func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
 	var (
 		subject string
 		verbose bool
@@ -233,21 +233,21 @@ func runwatch(wt watcher) {
 	}
 }
 
-func checkCRNList(crns []int, subject string, sflags *schedualFlags) error {
-	schedual, err := sched.BySubject(sflags.year, sflags.term, subject, true)
+func checkCRNList(crns []int, subject string, sflags *scheduleFlags) error {
+	schedule, err := sched.BySubject(sflags.year, sflags.term, subject, true)
 	if err != nil {
 		return err
 	}
 	openCrns := make([]int, 0)
 	for _, crn := range crns {
-		_, ok := schedual[crn]
+		_, ok := schedule[crn]
 		if !ok {
 			continue
 		}
 		openCrns = append(openCrns, crn)
 	}
 	if len(openCrns) == 0 {
-		return &internal.Error{Msg: fmt.Sprintf("could not find %v in schedual", crns), Code: 1}
+		return &internal.Error{Msg: fmt.Sprintf("could not find %v in schedule", crns), Code: 1}
 	}
 	msg := "Open crns:\n"
 	for _, crn := range openCrns {

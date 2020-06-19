@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/harrybrwn/edu/cmd/internal"
 	"github.com/harrybrwn/edu/pkg/files"
@@ -18,10 +17,8 @@ import (
 )
 
 type updateCmd struct {
-	wg       *sync.WaitGroup
 	cmd      *cobra.Command
 	out, err io.Writer
-	dl       *files.CourseDownloader
 
 	all, verbose bool
 	basedir      string
@@ -31,7 +28,6 @@ type updateCmd struct {
 
 func newUpdateCmd() *cobra.Command {
 	uc := &updateCmd{
-		wg:  &sync.WaitGroup{},
 		out: ioutil.Discard,
 		err: os.Stderr,
 		cmd: &cobra.Command{
@@ -58,7 +54,7 @@ func (uc *updateCmd) run(cmd *cobra.Command, args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	uc.dl = files.NewDownloader(uc.basedir)
+	dl := files.NewDownloader(uc.basedir)
 	if uc.verbose {
 		uc.out = os.Stdout
 	}
@@ -67,9 +63,9 @@ func (uc *updateCmd) run(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	var fn = uc.dl.Download
+	var fn = dl.Download
 	if uc.testPatters {
-		fn = uc.dl.CheckReplacements
+		fn = dl.CheckReplacements
 	}
 
 	for _, course := range courses {
@@ -84,7 +80,7 @@ func (uc *updateCmd) run(cmd *cobra.Command, args []string) (err error) {
 		}
 		fn(course, reps)
 	}
-	uc.dl.Wait()
+	dl.Wait()
 	fmt.Println("done.")
 	return nil
 }
@@ -98,7 +94,8 @@ func getReplacements() (map[string][]files.Replacement, []files.Replacement, err
 	})
 	reps := make([]files.Replacement, 0)
 	courseReps := make(map[string][]files.Replacement)
-	coursePats := viper.Get("course-replacements")
+	// coursePats := viper.Get("course-replacements")
+	coursePats := viperTryGetKeys([]string{"course-replacements", "course_replacements"})
 
 	err := errs.Pair(
 		mapstructure.Decode(filepats, &reps),
