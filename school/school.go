@@ -12,15 +12,17 @@ const (
 	UCMerced
 )
 
-// Course is an interface that defaines a generic
-// course object for a school schedual.
+// Course is an interface that defines a generic
+// course object for a school schedule.
 type Course interface {
 	SeatsOpen() int
 	Name() string
 	ID() int
 }
 
-// Schedual is an interface that represents a
-// school schedual.
-type Schedual interface {
+// Schedule is an interface that represents a
+// school schedule.
+type Schedule interface {
+	Courses() []Course
+	Get(id int) Course
 }

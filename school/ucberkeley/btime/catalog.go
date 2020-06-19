@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+
+	"github.com/harrybrwn/edu/school"
 )
 
 const (
@@ -48,6 +50,8 @@ type Catalog struct {
 
 	DefaultPlaylists string `json:"default_playlists"`
 	DefaultCourse    string `json:"default_course"`
+
+	courses map[int]*Result
 }
 
 // AllItems returns a slice of all of the items in the catalog.
@@ -70,6 +74,18 @@ func (c *Catalog) AllItems() []Item {
 	items = append(items, c.Semester...)
 	items = append(items, c.Units...)
 	return items
+}
+
+// Get will get a course given an id.
+func (c *Catalog) Get(id int) school.Course {
+	if c.courses == nil {
+		return nil
+	}
+	course, ok := c.courses[id]
+	if !ok {
+		return nil
+	}
+	return course
 }
 
 // Items is a slice of Item structs
@@ -137,7 +153,7 @@ func (rs Results) Swap(i, j int) {
 type Result struct {
 	Title              string  `json:"title"`
 	Description        string  `json:"description"`
-	ID                 int     `json:"id"`
+	ResultID           int     `json:"id"`
 	Units              string  `json:"units"`
 	OpenSeats          int     `json:"open_seats"`
 	Abbreviation       string  `json:"abbreviation"`
@@ -149,6 +165,16 @@ type Result struct {
 
 	GradeAverage  float64 `json:"grade_average"`
 	LetterAverage string  `json:"letter_average"`
+}
+
+// ID returns the id
+func (r *Result) ID() int {
+	return r.ResultID
+}
+
+// Name returns the courses Title
+func (r *Result) Name() string {
+	return r.Title
 }
 
 // Course will get the course associated with the filter result.
@@ -188,6 +214,21 @@ func (c *Catalog) DefaultFilter() (Results, error) {
 	return sendFilter(opts)
 }
 
+// Courses returns a slice of Results in a generic
+// Course interface format. Returns nil on error.
+func (c *Catalog) Courses() []school.Course {
+	results, err := c.DefaultFilter()
+	if err != nil {
+		return nil
+	}
+	courses := make([]school.Course, len(results))
+	for i, r := range results {
+		c.courses[r.ResultID] = &r
+		courses[i] = &r
+	}
+	return courses
+}
+
 // Filter will return the results from a filter request given
 // filter option IDs.
 func Filter(opts ...interface{}) (Results, error) {
@@ -220,3 +261,8 @@ func sendFilter(filter []string) (Results, error) {
 	res := make([]Result, 0)
 	return res, json.NewDecoder(resp.Body).Decode(&res)
 }
+
+var (
+	_ school.Schedule = (*Catalog)(nil)
+	_ school.Course   = (*Result)(nil)
+)

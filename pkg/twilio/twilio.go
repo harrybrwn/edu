@@ -61,7 +61,7 @@ func SetSender(phone string) {
 	defaultClient.SetSender(phone)
 }
 
-// Send will a message given the recipiant's phone number.
+// Send will a message given the recipient's phone number.
 func (c *Client) Send(to, body string) (*MessageResponse, error) {
 	if c.SenderNumber == "" {
 		return nil, errors.New("could not find a SenderNumber")
@@ -69,12 +69,12 @@ func (c *Client) Send(to, body string) (*MessageResponse, error) {
 	return c.SendFrom(c.SenderNumber, to, body)
 }
 
-// Send will a message given the recipiant's phone number.
+// Send will a message given the recipient's phone number.
 func Send(to, body string) (*MessageResponse, error) {
 	return defaultClient.Send(to, body)
 }
 
-// SendFrom will send a message given the sender's number and the recipiant's number.
+// SendFrom will send a message given the sender's number and the recipient's number.
 func (c *Client) SendFrom(from, to, body string) (*MessageResponse, error) {
 	if c.sid == "" {
 		return nil, errors.New("no twilio sid")
@@ -103,7 +103,7 @@ func (c *Client) SendFrom(from, to, body string) (*MessageResponse, error) {
 	return mr, json.NewDecoder(resp.Body).Decode(mr)
 }
 
-// SendFrom will send a message given the sender's number and the recipiant's number.
+// SendFrom will send a message given the sender's number and the recipient's number.
 func SendFrom(from, to, body string) (*MessageResponse, error) {
 	return defaultClient.SendFrom(from, to, body)
 }

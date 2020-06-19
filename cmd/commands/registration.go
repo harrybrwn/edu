@@ -13,7 +13,7 @@ import (
 	"github.com/harrybrwn/edu/cmd/internal"
 	"github.com/harrybrwn/edu/cmd/internal/opts"
 	"github.com/harrybrwn/edu/pkg/info"
-	"github.com/harrybrwn/edu/school/ucmerced/sched"
+	"github.com/harrybrwn/edu/school/ucmerced/ucm"
 	"github.com/harrybrwn/errs"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cobra"
@@ -77,7 +77,7 @@ registration information.`,
 					return err
 				}
 			}
-			schedule, err := sched.BySubject(
+			schedule, err := ucm.BySubject(
 				sflags.year, sflags.term,
 				subj, sflags.open,
 			) // still works with an empty subj
@@ -111,7 +111,7 @@ func newCheckCRNCmd(sflags *scheduleFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "check-crns",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			schedule, err := sched.BySubject(sflags.year, sflags.term, subject, true)
+			schedule, err := ucm.BySubject(sflags.year, sflags.term, subject, true)
 			if err != nil {
 				return err
 			}
@@ -234,7 +234,7 @@ func runwatch(wt watcher) {
 }
 
 func checkCRNList(crns []int, subject string, sflags *scheduleFlags) error {
-	schedule, err := sched.BySubject(sflags.year, sflags.term, subject, true)
+	schedule, err := ucm.BySubject(sflags.year, sflags.term, subject, true)
 	if err != nil {
 		return err
 	}
@@ -260,7 +260,7 @@ func checkCRNList(crns []int, subject string, sflags *scheduleFlags) error {
 	return nil
 }
 
-func courseRow(c *sched.Course, title bool) []string {
+func courseRow(c *ucm.Course, title bool) []string {
 	var timeStr = "TBD"
 	if c.Time.Start.Hour() != 0 && c.Time.End.Hour() != 0 {
 		timeStr = fmt.Sprintf("%s-%s",
@@ -319,7 +319,7 @@ func strjoin(list []time.Weekday, sep string) string {
 	return strings.Join(strs, sep)
 }
 
-func courseAsDict(c *sched.Course) map[string]interface{} {
+func courseAsDict(c *ucm.Course) map[string]interface{} {
 	m := make(map[string]interface{})
 	mapstructure.Decode(c, &m)
 	return m

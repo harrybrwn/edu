@@ -1,4 +1,4 @@
-package sched
+package ucm
 
 import (
 	"errors"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/harrybrwn/edu/school"
 	"github.com/harrybrwn/errs"
 )
 
@@ -23,6 +24,24 @@ var terms = map[string]string{
 
 // Schedule is a map of courses by course CRN
 type Schedule map[int]*Course
+
+// Get will get a course given the course id
+func (s *Schedule) Get(id int) school.Course {
+	c, ok := (*s)[id]
+	if !ok {
+		return nil
+	}
+	return c
+}
+
+// Courses returns a list of courses as a course interface.
+func (s *Schedule) Courses() []school.Course {
+	courses := make([]school.Course, len(*s))
+	for _, c := range *s {
+		courses[c.order] = c
+	}
+	return courses
+}
 
 // Ordered will return a slice of courses that preserves
 // the original order.
@@ -60,6 +79,16 @@ type Course struct {
 	order   int
 }
 
+// ID returns the course's crn
+func (c *Course) ID() int {
+	return c.CRN
+}
+
+// Name returns the courses title
+func (c *Course) Name() string {
+	return c.Title
+}
+
 // SeatsOpen gets the number of seats available for the course.
 func (c *Course) SeatsOpen() int {
 	seats, err := strconv.Atoi(c.seats)
@@ -91,7 +120,7 @@ func BySubject(year int, term, subject string, open bool) (Schedule, error) {
 		return nil, err
 	}
 	selection := doc.Find(selector)
-	schedual := Schedule{}
+	schedule := Schedule{}
 	keys := make([]string, 13)
 	var (
 		keyerr error
@@ -128,10 +157,10 @@ func BySubject(year int, term, subject string, open bool) (Schedule, error) {
 			panic(err)
 		}
 		course.order = order
-		schedual[course.CRN] = course
+		schedule[course.CRN] = course
 		order++
 	})
-	return schedual, keyerr
+	return schedule, keyerr
 }
 
 func newCourse(data []string) (*Course, error) {
@@ -259,3 +288,8 @@ func getData(year, term, subject string, openclasses bool) (*http.Response, erro
 	}
 	return client.Do(req)
 }
+
+var (
+	_ school.Schedule = (*Schedule)(nil)
+	_ school.Course   = (*Course)(nil)
+)
