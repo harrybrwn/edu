@@ -94,7 +94,6 @@ func getReplacements() (map[string][]files.Replacement, []files.Replacement, err
 	})
 	reps := make([]files.Replacement, 0)
 	courseReps := make(map[string][]files.Replacement)
-	// coursePats := viper.Get("course-replacements")
 	coursePats := viperTryGetKeys([]string{"course-replacements", "course_replacements"})
 
 	err := errs.Pair(

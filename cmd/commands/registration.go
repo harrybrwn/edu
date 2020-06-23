@@ -156,6 +156,7 @@ func (wf watcherFunc) Watch() error {
 
 type crnWatcher struct {
 	crns    []int
+	names   []string
 	subject string
 	flags   *scheduleFlags
 	verbose bool
@@ -176,7 +177,16 @@ func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
 	var (
 		subject string
 		verbose bool
+		term    = viper.GetString("watch.term")
+		year    = viper.GetInt("watch.year")
 	)
+	if term != "" {
+		sflags.term = term
+	}
+	if year != 0 {
+		sflags.year = year
+	}
+
 	c := &cobra.Command{
 		Use:   "watch",
 		Short: "Watch for availability changes in a list of CRNs",

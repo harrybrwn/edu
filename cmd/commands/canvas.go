@@ -49,12 +49,16 @@ func (ff *fileFinder) addToFlagSet(flagset *pflag.FlagSet) {
 	flagset.StringVar(&ff.search, "search", "", "search for files by name")
 }
 
-func init() {
-	canvasCmd.AddCommand(
+func canvasCommands() []*cobra.Command {
+	return []*cobra.Command{
 		newFilesCmd(),
 		dueCmd,
 		newUploadCmd(),
-	)
+	}
+}
+
+func init() {
+	canvasCmd.AddCommand(canvasCommands()...)
 }
 
 var (
@@ -170,7 +174,7 @@ func upload(filename, uploadname string) (err error) {
 	}
 	defer func() {
 		// set the return value in case of close error
-		if e := file.Close(); e != nil {
+		if e := file.Close(); e != nil && err == nil {
 			err = e
 		}
 	}()

@@ -99,10 +99,10 @@ func init() {
 
 var (
 	root = &cobra.Command{
-		Use: "edu",
-		// SilenceErrors: true,
-		// SilenceUsage:  true,
-		Version: version,
+		Use:           "edu",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		Version:       version,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			host := viper.GetString("host")
 			if host != "" {
