@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"sort"
 	"strings"
 
 	"github.com/harrybrwn/edu/school"
@@ -102,24 +101,6 @@ func (its Items) Search(term string) *Item {
 	return nil
 }
 
-// Sort the list of items.
-func (its *Items) Sort() {
-	sort.Sort(its)
-}
-
-func (its Items) Len() int {
-	return len(its)
-}
-
-func (its Items) Less(i, j int) bool {
-	return strings.Compare(its[i].Name, its[j].Name) <= 0
-}
-
-func (its Items) Swap(i, j int) {
-	a, b := its[i], its[j]
-	its[i], its[j] = b, a
-}
-
 // Item is an item on the catalog
 type Item struct {
 	Name     string `json:"name"`
@@ -129,25 +110,8 @@ type Item struct {
 	ID       int    `json:"id"`
 }
 
-type searchable interface {
-	match(term string) bool
-}
-
 // Results is a slice of result structs
 type Results []Result
-
-func (rs Results) Len() int {
-	return len(rs)
-}
-
-func (rs Results) Less(i, j int) bool {
-	return rs[i].GradeAverage > rs[i].GradeAverage
-}
-
-func (rs Results) Swap(i, j int) {
-	a, b := rs[i], rs[j]
-	rs[i], rs[j] = b, a
-}
 
 // Result is the result from the filter endpoint.
 type Result struct {
@@ -186,7 +150,7 @@ func (r *Result) Course() (*Course, error) {
 			Scheme:   "https",
 			Host:     "www.berkeleytime.com",
 			Path:     "/api/catalog/catalog_json/course_box/",
-			RawQuery: fmt.Sprintf("course_id=%d", r.ID),
+			RawQuery: fmt.Sprintf("course_id=%d", r.ResultID),
 		},
 	}
 	resp, err := http.DefaultClient.Do(req)

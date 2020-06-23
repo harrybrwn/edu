@@ -1,6 +1,9 @@
 package ucm
 
 import (
+	"bytes"
+	"fmt"
+	"net/http"
 	"testing"
 )
 
@@ -81,4 +84,26 @@ func TestParseTime(t *testing.T) {
 			t.Errorf("wrong ending hour %d; want %d", end.Hour(), tc.end)
 		}
 	}
+}
+
+func TestScratch(t *testing.T) {
+	t.Skip("don't need this test")
+	// https://crossenrollcourses.universityofcalifornia.edu/?home_campus=7&term_year=1-2020&subject_area=9&with_prev&pageSize=10
+	url := "http://registrar.ucmerced.edu/go/schedule"
+	client := http.Client{
+		CheckRedirect: func(r *http.Request, via []*http.Request) error {
+			fmt.Println(r.URL)
+			return nil
+		},
+	}
+	resp, err := client.Get(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var b bytes.Buffer
+	if _, err = b.ReadFrom(resp.Body); err != nil {
+		t.Error(err)
+	}
+	fmt.Println(b.String())
 }

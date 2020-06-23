@@ -1,5 +1,7 @@
 package school
 
+import "strings"
+
 //go:generate stringer -type School -linecomment school.go
 
 // School is a type that identifies a school
@@ -25,4 +27,17 @@ type Course interface {
 type Schedule interface {
 	Courses() []Course
 	Get(id int) Course
+}
+
+// FromName returns a school code based on the name of
+// the school. Returns -1 if the name is unknown.
+func FromName(schoolname string) School {
+	switch strings.ToLower(schoolname) {
+	case "ucmerced", "merced":
+		return UCMerced
+	case "ucberkeley", "berkeley":
+		return UCBerkeley
+	default:
+		return -1
+	}
 }

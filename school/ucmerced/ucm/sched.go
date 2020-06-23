@@ -22,8 +22,26 @@ var terms = map[string]string{
 	"fall":   "30",
 }
 
+// ScheduleConfig holds options for getting
+// the UC Merced schedule
+type ScheduleConfig struct {
+	Year    int
+	Term    string
+	Subject string
+	Open    bool
+}
+
 // Schedule is a map of courses by course CRN
 type Schedule map[int]*Course
+
+// NewSchedule will return a new schedule based on the config.
+func NewSchedule(config ScheduleConfig) (Schedule, error) {
+	sched, err := getSchedule(config.Year, config.Term, config.Subject, config.Open)
+	if err != nil {
+		return nil, err
+	}
+	return sched, nil
+}
 
 // Get will get a course given the course id
 func (s *Schedule) Get(id int) school.Course {
@@ -89,6 +107,12 @@ func (c *Course) Name() string {
 	return c.Title
 }
 
+// CourseNumber returns the number used to semantically
+// identify the course
+func (c *Course) CourseNumber() int {
+	return c.Number
+}
+
 // SeatsOpen gets the number of seats available for the course.
 func (c *Course) SeatsOpen() int {
 	seats, err := strconv.Atoi(c.seats)
@@ -102,11 +126,16 @@ func (c *Course) SeatsOpen() int {
 
 // Get gets the schedule
 func Get(year int, term string, open bool) (Schedule, error) {
-	return BySubject(year, term, "", open)
+	return getSchedule(year, term, "", open)
 }
 
 // BySubject gets the schedule and only one subject given a subject code.
 func BySubject(year int, term, subject string, open bool) (Schedule, error) {
+	return getSchedule(year, term, subject, open)
+}
+
+// bySubject gets the schedule and only one subject given a subject code.
+func getSchedule(year int, term, subject string, open bool) (Schedule, error) {
 	resp, err := getData(fmt.Sprintf("%d", year), term, strings.ToUpper(subject), open)
 	if err != nil {
 		return nil, err
