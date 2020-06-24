@@ -21,6 +21,9 @@ misc/systemd/edu.service:
 	./edu gen-service -f $@
 	go clean
 
+snapshot:
+	goreleaser release --skip-publish --snapshot
+
 clean:
 	go clean
 	$(RM) -r dist

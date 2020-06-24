@@ -13,6 +13,7 @@ import (
 	"github.com/harrybrwn/edu/cmd/internal"
 	"github.com/harrybrwn/edu/cmd/internal/opts"
 	"github.com/harrybrwn/edu/pkg/info"
+	"github.com/harrybrwn/edu/pkg/term"
 	"github.com/harrybrwn/edu/school/ucmerced/ucm"
 	"github.com/harrybrwn/errs"
 	"github.com/mitchellh/mapstructure"
@@ -92,7 +93,7 @@ registration information.`,
 				if num != 0 && c.Number != num {
 					continue
 				}
-				tab.Append(courseRow(c, true))
+				tab.Append(courseRow(c, true, sflags))
 			}
 			if tab.NumLines() == 0 {
 				return &internal.Error{Msg: "no matches", Code: 1}
@@ -131,7 +132,7 @@ func newCheckCRNCmd(sflags *scheduleFlags) *cobra.Command {
 				if !ok {
 					continue
 				}
-				tab.Append(courseRow(course, false))
+				tab.Append(courseRow(course, false, *sflags))
 			}
 			if tab.NumLines() == 0 {
 				return &internal.Error{Msg: fmt.Sprintf("could not find %v in schedule", crns), Code: 1}
@@ -270,7 +271,7 @@ func checkCRNList(crns []int, subject string, sflags *scheduleFlags) error {
 	return nil
 }
 
-func courseRow(c *ucm.Course, title bool) []string {
+func courseRow(c *ucm.Course, title bool, flags scheduleFlags) []string {
 	var timeStr = "TBD"
 	if c.Time.Start.Hour() != 0 && c.Time.End.Hour() != 0 {
 		timeStr = fmt.Sprintf("%s-%s",
@@ -278,11 +279,21 @@ func courseRow(c *ucm.Course, title bool) []string {
 			c.Time.End.Format("3:04pm"))
 	}
 	days := strjoin(c.Days, ",")
+	seats := c.SeatsOpen()
+	var open = strconv.Itoa(seats)
+	if !flags.NoColor {
+		if seats == 0 {
+			open = term.Red(open)
+		} else {
+			open = term.Green(open)
+		}
+	}
+
 	if title {
 		return []string{
 			strconv.Itoa(c.CRN),
 			c.Fullcode,
-			strconv.Itoa(c.SeatsOpen()),
+			open,
 			c.Activity,
 			cleanTitle(c.Title),
 			timeStr,
@@ -292,7 +303,7 @@ func courseRow(c *ucm.Course, title bool) []string {
 	return []string{
 		strconv.Itoa(c.CRN),
 		c.Fullcode,
-		strconv.Itoa(c.SeatsOpen()),
+		open,
 		c.Activity,
 		timeStr,
 		days,
