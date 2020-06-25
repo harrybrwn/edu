@@ -20,7 +20,7 @@ type Config struct {
 }
 
 // New will get a schedule based on the school type given.
-func New(sc school.School, config Config) (school.Schedule, error) {
+func New(sc school.School, config *Config) (school.Schedule, error) {
 	switch sc {
 	case school.UCBerkeley:
 		catalog, err := btime.New()

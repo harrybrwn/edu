@@ -15,6 +15,9 @@ import (
 
 // All returns all the commands.
 func All(globals *opts.Global) []*cobra.Command {
+	canvasCmd.AddCommand(
+		canvasCommands(globals)...,
+	)
 	return []*cobra.Command{
 		newCoursesCmd(globals),
 		newConfigCmd(),

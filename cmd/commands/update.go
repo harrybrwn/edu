@@ -2,10 +2,7 @@ package commands
 
 import (
 	"fmt"
-	"io"
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/harrybrwn/edu/cmd/internal"
@@ -17,9 +14,6 @@ import (
 )
 
 type updateCmd struct {
-	cmd      *cobra.Command
-	out, err io.Writer
-
 	all, verbose bool
 	basedir      string
 	testPatters  bool
@@ -28,25 +22,23 @@ type updateCmd struct {
 
 func newUpdateCmd() *cobra.Command {
 	uc := &updateCmd{
-		out: ioutil.Discard,
-		err: os.Stderr,
-		cmd: &cobra.Command{
-			Use:   "update",
-			Short: "Download all the files from canvas",
-		},
 		all:     false,
 		verbose: false,
 		sortBy:  []string{"created_at"},
 		basedir: os.ExpandEnv(viper.GetString("basedir")),
 	}
-	flags := uc.cmd.Flags()
+	cmd := &cobra.Command{
+		Use:   "update",
+		Short: "Download all the files from canvas",
+		RunE:  uc.run,
+	}
+	flags := cmd.Flags()
 	flags.BoolVarP(&uc.all, "all", "a", uc.all, "download files from all courses, defaults to only active courses")
 	flags.BoolVarP(&uc.verbose, "verbose", "v", uc.verbose, "run update in verbose mode (prints out files)")
 	flags.BoolVar(&uc.testPatters, "test-patterns", uc.testPatters, "test the replacement patterns from the config file")
 	flags.StringVar(&uc.basedir, "base-dir", uc.basedir, "base directory for file downloads")
 	flags.StringArrayVarP(&uc.sortBy, "sort-by", "s", uc.sortBy, "select the file sorting methods")
-	uc.cmd.RunE = uc.run
-	return uc.cmd
+	return cmd
 }
 
 func (uc *updateCmd) run(cmd *cobra.Command, args []string) (err error) {
@@ -56,7 +48,7 @@ func (uc *updateCmd) run(cmd *cobra.Command, args []string) (err error) {
 	}
 	dl := files.NewDownloader(uc.basedir)
 	if uc.verbose {
-		uc.out = os.Stdout
+		dl.Stdout = os.Stdout
 	}
 	coursereps, replacements, err := getReplacements()
 	if err != nil {
@@ -101,14 +93,6 @@ func getReplacements() (map[string][]files.Replacement, []files.Replacement, err
 		mapstructure.Decode(coursePats, &courseReps),
 	)
 	return upperMapKeys(courseReps), reps, err
-}
-
-func relpath(base, p string) string {
-	rel, err := filepath.Rel(base, p)
-	if err != nil {
-		panic(err)
-	}
-	return rel
 }
 
 func viperTryGetKeys(keys []string) interface{} {

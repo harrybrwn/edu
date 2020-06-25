@@ -141,6 +141,7 @@ func getSchedule(year int, term, subject string, open bool) (Schedule, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, errs.New(resp.Status)
 	}

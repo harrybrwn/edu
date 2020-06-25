@@ -7,6 +7,10 @@ import (
 	"testing"
 )
 
+func Test(t *testing.T) {
+
+}
+
 func TestGet(t *testing.T) {
 	sch, err := Get(2020, "spring", false)
 	if err != nil {
@@ -47,7 +51,7 @@ func TestSched_Err(t *testing.T) {
 	}
 }
 
-func Test(t *testing.T) {
+func TestGetFall(t *testing.T) {
 	sc, err := Get(2020, "fall", true)
 	if err != nil {
 		t.Error(err)

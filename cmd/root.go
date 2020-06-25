@@ -59,7 +59,6 @@ func Execute() (err error) {
 	if configfile != "" {
 		Logger.Filename = filepath.Join(filepath.Dir(configfile), "logs", "edu.log")
 	}
-
 	globalFlags := opts.Global{}
 	globalFlags.AddToFlagSet(root.PersistentFlags())
 
@@ -88,6 +87,7 @@ func init() {
 	viper.BindEnv("canvas_token", "CANVAS_TOKEN")
 	viper.BindEnv("twilio_sid", "TWILIO_SID")
 	viper.BindEnv("twilio_token", "TWILIO_TOKEN")
+	// viper.BindEnv("editor", "EDITOR")
 
 	viper.SetDefault("editor", os.Getenv("EDITOR"))
 	viper.SetDefault("basedir", "$HOME/.edu/files")

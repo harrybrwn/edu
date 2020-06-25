@@ -6,8 +6,11 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 
 	"github.com/harrybrwn/edu/cmd/internal"
+	"github.com/harrybrwn/edu/cmd/internal/opts"
+	"github.com/harrybrwn/edu/pkg/term"
 	"github.com/harrybrwn/go-canvas"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -49,16 +52,14 @@ func (ff *fileFinder) addToFlagSet(flagset *pflag.FlagSet) {
 	flagset.StringVar(&ff.search, "search", "", "search for files by name")
 }
 
-func canvasCommands() []*cobra.Command {
+// CanvasCommands gets all the canvas commands
+func canvasCommands(flags *opts.Global) []*cobra.Command {
 	return []*cobra.Command{
 		newFilesCmd(),
-		dueCmd,
+		newDueCmd(flags),
 		newUploadCmd(),
+		assignmentsCmd(),
 	}
-}
-
-func init() {
-	canvasCmd.AddCommand(canvasCommands()...)
 }
 
 var (
@@ -67,7 +68,10 @@ var (
 		Aliases: []string{"canv", "ca"},
 		Short:   "A small collection of helper commands for canvas",
 	}
-	dueCmd = &cobra.Command{
+)
+
+func newDueCmd(flags *opts.Global) *cobra.Command {
+	dueCmd := &cobra.Command{
 		Use:   "due",
 		Short: "List all the due date on canvas.",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -76,17 +80,25 @@ var (
 				return err
 			}
 			tab := internal.NewTable(cmd.OutOrStdout())
-			internal.SetTableHeader(tab, []string{"name", "due"}, true)
+			internal.SetTableHeader(tab, []string{"id", "name", "due"}, !flags.NoColor)
 			for _, course := range courses {
 				for as := range course.Assignments() {
-					tab.Append([]string{as.Name, as.DueAt.String()})
+					tab.Append([]string{
+						strconv.Itoa(as.ID),
+						as.Name,
+						as.DueAt.Local().String(),
+					})
 				}
+				cmd.Println(term.Colorf("  %m", course.Name))
+				tab.Render()
+				tab.ClearRows()
+				println()
 			}
-			tab.Render()
 			return nil
 		},
 	}
-)
+	return dueCmd
+}
 
 func newFilesCmd() *cobra.Command {
 	var (
@@ -124,6 +136,35 @@ func newFilesCmd() *cobra.Command {
 	flags := c.Flags()
 	flags.StringArrayVarP(&sortby, "sortyby", "s", sortby, "how the files should be sorted")
 	ff.addToFlagSet(flags)
+	return c
+}
+
+func assignmentsCmd() *cobra.Command {
+	c := &cobra.Command{
+		Use:     "assignments",
+		Hidden:  true,
+		Aliases: []string{"as"},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id, err := strconv.Atoi(args[0])
+			if err != nil {
+				return err
+			}
+			courses, err := internal.GetCourses(true)
+			if err != nil {
+				return err
+			}
+			for _, course := range courses {
+				as, err := course.Assignment(id)
+				if err != nil {
+					continue
+				}
+				fmt.Println(term.Colorf("%b %r", as.Name, as.DueAt.Local().String()))
+				fmt.Printf("%s\n", as.Description)
+				return nil
+			}
+			return fmt.Errorf("did not find assignment %d", id)
+		},
+	}
 	return c
 }
 

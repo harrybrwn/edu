@@ -282,7 +282,7 @@ func courseRow(c *ucm.Course, title bool, flags scheduleFlags) []string {
 	seats := c.SeatsOpen()
 	var open = strconv.Itoa(seats)
 	if !flags.NoColor {
-		if seats == 0 {
+		if seats <= 0 {
 			open = term.Red(open)
 		} else {
 			open = term.Green(open)

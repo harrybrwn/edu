@@ -6,7 +6,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.5.1
 	github.com/gen2brain/beeep v0.0.0-20200526185328-e9c15c258e28
 	github.com/harrybrwn/errs v0.0.2-0.20200523142445-e4279967174e
-	github.com/harrybrwn/go-canvas v0.0.2-0.20200527220803-5c0edfe62d02
+	github.com/harrybrwn/go-canvas v0.0.0-00010101000000-000000000000
 	github.com/mitchellh/mapstructure v1.3.2
 	github.com/olekukonko/tablewriter v0.0.4
 	github.com/pkg/errors v0.9.1
