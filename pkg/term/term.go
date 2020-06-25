@@ -26,6 +26,19 @@ const (
 	FgWhite
 )
 
+const (
+	Reset = iota
+	Bold
+	Faint
+	Italic
+	Underlined
+	BlinkSlow
+	BlinkFast
+	Inverted
+	Hidden
+	CrossedOut
+)
+
 func init() {
 	switch runtime.GOOS {
 	case "windows":
@@ -33,8 +46,13 @@ func init() {
 		escape = ""
 	default:
 		Output = os.Stdout
-		escape = "\033"
+		escape = "\x1b"
 	}
+}
+
+// Color256 outputs s in the 256 color format.
+func Color256(code uint8, s string) string {
+	return fmt.Sprintf("%s[38;5;%dm%s%s[0m", escape, code, s, escape)
 }
 
 // CursorOn turns the cursor on

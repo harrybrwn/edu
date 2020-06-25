@@ -3,6 +3,7 @@ package files
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -45,6 +46,8 @@ func Download(
 // NewDownloader creates a new CourseDownloader
 func NewDownloader(basedir string) *CourseDownloader {
 	return &CourseDownloader{
+		Stdout:  ioutil.Discard,
+		Stderr:  os.Stderr,
 		wg:      new(sync.WaitGroup),
 		basedir: basedir,
 	}
@@ -53,6 +56,8 @@ func NewDownloader(basedir string) *CourseDownloader {
 // DownloaderFromWG will create a course downloader form an existing waitgroup.
 func DownloaderFromWG(basedir string, wg *sync.WaitGroup) *CourseDownloader {
 	return &CourseDownloader{
+		Stdout:  os.Stdout,
+		Stderr:  os.Stderr,
 		wg:      wg,
 		basedir: basedir,
 	}
@@ -61,8 +66,9 @@ func DownloaderFromWG(basedir string, wg *sync.WaitGroup) *CourseDownloader {
 // CourseDownloader will download files from a
 // canvas course.
 type CourseDownloader struct {
-	wg      *sync.WaitGroup
-	basedir string
+	Stdout, Stderr io.Writer
+	wg             *sync.WaitGroup
+	basedir        string
 }
 
 // Wait calls wait on the internal waitgroup
@@ -166,7 +172,7 @@ func (cd *CourseDownloader) downloadFile(file *canvas.File, path string, reps []
 	if err := mkdir(dir); err != nil {
 		return err
 	}
-	return Download(file, fullpath, os.Stdout, os.Stderr)
+	return Download(file, fullpath, cd.Stdout, cd.Stderr)
 }
 
 func relpath(base, p string) string {

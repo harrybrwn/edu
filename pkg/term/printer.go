@@ -5,10 +5,38 @@ import (
 	"fmt"
 )
 
+// Colorf will generate a formatted string based on color format codes,
+// so basically fmt.Sprintf but for terminal colors.
+//
+// Syntax:
+//	%[modifier]<forground>
+//
+// Forground Colors:
+//	%r - red
+//	%g - green
+//	%y - yellow
+//	%b - blue
+//	%m - magenta
+//	%c - cyan
+//	%w - white
+//	%0 - reset (no op)
+//
+// Modifiers:
+//	%!r - red bold
+//	%.r - red faint
+//	%'r - red italic
+//	%_r - red underlined
+//	%?r - red inverted
+//	% r - red hidden
+//	%-r - red crossed out
 func Colorf(format string, a ...string) string {
-	end := len(format)
-	arg := 0
-	buf := &bytes.Buffer{}
+	var (
+		modifier int
+		color    int
+		end      = len(format)
+		arg      = 0
+		buf      = &bytes.Buffer{}
+	)
 
 	for i := 0; i < end; i++ {
 		prev := i
@@ -23,17 +51,43 @@ func Colorf(format string, a ...string) string {
 		}
 
 		i++
-		color := getForground(format[i])
-		// if we don't know what it is
-		// then put it back assuming it
-		// is meant for the fmt package
-		if color == 0 {
-			buf.WriteByte('%')
-			buf.WriteByte(format[i])
-			continue
-		}
+		chr := format[i]
 
-		fmt.Fprintf(buf, "%s[%dm", escape, color)
+		switch chr {
+		case '%': // if %% is in the format
+			buf.WriteByte('%')
+			continue
+		case '!':
+			modifier = Bold
+		case '.':
+			modifier = Faint
+		case '\'':
+			modifier = Italic
+		case '_':
+			modifier = Underlined
+		case '*':
+			modifier = BlinkSlow
+			if format[i+1] == '*' {
+				modifier = BlinkFast
+				i++
+			}
+		case '?':
+			modifier = Inverted
+		case ' ':
+			modifier = Hidden
+		case '-':
+			modifier = CrossedOut
+		}
+		if modifier != 0 {
+			i++
+		}
+		color = getForground(format[i])
+
+		if modifier != 0 {
+			fmt.Fprintf(buf, "%s[%d;%dm", escape, color, modifier)
+		} else {
+			fmt.Fprintf(buf, "%s[%dm", escape, color)
+		}
 		buf.WriteString(a[arg])
 		fmt.Fprintf(buf, "%s[0m", escape)
 		arg++
@@ -57,6 +111,8 @@ func getForground(code byte) int {
 		return FgCyan
 	case 'w':
 		return FgWhite
+	case '0':
+		return Reset
 	}
-	return 0
+	return Reset
 }
