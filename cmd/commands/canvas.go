@@ -6,14 +6,20 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/harrybrwn/edu/cmd/internal"
 	"github.com/harrybrwn/edu/cmd/internal/opts"
 	"github.com/harrybrwn/edu/pkg/term"
 	"github.com/harrybrwn/go-canvas"
+	"github.com/jaytaylor/html2text"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 )
 
 type fileFinder struct {
@@ -70,7 +76,27 @@ var (
 	}
 )
 
+type dueDate struct {
+	id, name string
+	date     time.Time
+}
+
+type dueDates []dueDate
+
+func (dd dueDates) Len() int {
+	return len(dd)
+}
+
+func (dd dueDates) Swap(i, j int) {
+	dd[i], dd[j] = dd[j], dd[i]
+}
+
+func (dd dueDates) Less(i, j int) bool {
+	return dd[i].date.Before(dd[j].date)
+}
+
 func newDueCmd(flags *opts.Global) *cobra.Command {
+	var nolinks, all bool
 	dueCmd := &cobra.Command{
 		Use:   "due",
 		Short: "List all the due date on canvas.",
@@ -79,15 +105,52 @@ func newDueCmd(flags *opts.Global) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if len(args) > 0 {
+				for _, course := range courses {
+					id, err := strconv.Atoi(args[0])
+					if err != nil {
+						return err
+					}
+					as, err := course.Assignment(id)
+					if err != nil {
+						continue
+					}
+					text, err := html2text.FromString(
+						as.Description,
+						html2text.Options{
+							PrettyTables: true,
+							OmitLinks:    nolinks,
+						},
+					)
+					if err != nil {
+						return err
+					}
+					fmt.Println(term.Colorf("%b %r", as.Name, as.DueAt.Local().String()))
+					fmt.Println(text)
+					return nil
+				}
+				return nil
+			}
+
 			tab := internal.NewTable(cmd.OutOrStdout())
 			internal.SetTableHeader(tab, []string{"id", "name", "due"}, !flags.NoColor)
+			now := time.Now().Local()
 			for _, course := range courses {
+				var dates dueDates
 				for as := range course.Assignments() {
-					tab.Append([]string{
-						strconv.Itoa(as.ID),
-						as.Name,
-						as.DueAt.Local().String(),
+					dueAt := as.DueAt.Local()
+					if !all && dueAt.Before(now) {
+						continue
+					}
+					dates = append(dates, dueDate{
+						id:   strconv.Itoa(as.ID),
+						name: as.Name,
+						date: dueAt,
 					})
+				}
+				sort.Sort(dates)
+				for _, d := range dates {
+					tab.Append([]string{d.id, d.name, d.date.Format(time.RFC822)})
 				}
 				cmd.Println(term.Colorf("  %m", course.Name))
 				tab.Render()
@@ -97,6 +160,8 @@ func newDueCmd(flags *opts.Global) *cobra.Command {
 			return nil
 		},
 	}
+	dueCmd.Flags().BoolVar(&nolinks, "no-links", false, "hide links from assignment description")
+	dueCmd.Flags().BoolVarP(&all, "all", "a", false, "show all the assignments")
 	return dueCmd
 }
 
@@ -140,6 +205,7 @@ func newFilesCmd() *cobra.Command {
 }
 
 func assignmentsCmd() *cobra.Command {
+	var nolinks bool
 	c := &cobra.Command{
 		Use:     "assignments",
 		Hidden:  true,
@@ -158,13 +224,24 @@ func assignmentsCmd() *cobra.Command {
 				if err != nil {
 					continue
 				}
+				text, err := html2text.FromString(
+					as.Description,
+					html2text.Options{
+						PrettyTables: true,
+						OmitLinks:    nolinks,
+					},
+				)
+				if err != nil {
+					return err
+				}
 				fmt.Println(term.Colorf("%b %r", as.Name, as.DueAt.Local().String()))
-				fmt.Printf("%s\n", as.Description)
+				fmt.Println(text)
 				return nil
 			}
 			return fmt.Errorf("did not find assignment %d", id)
 		},
 	}
+	c.Flags().BoolVar(&nolinks, "no-links", nolinks, "hide all links in the assignment description")
 	return c
 }
 
@@ -225,4 +302,58 @@ func upload(filename, uploadname string) (err error) {
 	}
 	_, err = canvas.UploadFile(uploadname, file, opts...)
 	return err
+}
+
+type iter interface {
+	Next() html.TokenType
+	Token() html.Token
+}
+
+func parseHTML(raw string) error {
+	root, err := html.Parse(strings.NewReader(raw))
+	if err != nil {
+		return err
+	}
+	// html.Render(os.Stdout, root)
+	for n := root.FirstChild; n != nil; n = n.NextSibling {
+		traverse(n, 1)
+	}
+	return nil
+}
+
+func traverse(node *html.Node, depth int) {
+	for n := node.FirstChild; n != nil; n = n.NextSibling {
+		// for i := 0; i < depth; i++ {
+		// 	print("  ")
+		// }
+		// fmt.Print(n.Type, " ")
+
+		switch n.Type {
+		case html.TextNode:
+			fmt.Print(n.Data)
+		case html.ElementNode:
+			switch n.DataAtom {
+			case atom.P:
+				printPTag(n, depth)
+			case atom.A:
+				printATag(n)
+			case atom.Br:
+				print("\n")
+			}
+		}
+		// println()
+
+		traverse(n, depth+1)
+	}
+}
+
+func printATag(node *html.Node) {
+	println()
+	print(node.FirstChild.Data)
+}
+
+func printPTag(node *html.Node, depth int) {
+	// fmt.Printf("'%s'", node.Data)
+	for n := node.FirstChild; n != nil; n = n.NextSibling {
+	}
 }

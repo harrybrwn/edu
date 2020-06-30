@@ -36,7 +36,13 @@ func Download(
 		if err != nil {
 			log.Printf("Error: %s", err.Error())
 		}
-		fmt.Fprintf(stdout, "Downloaded %s\n", filename)
+		// io.Discard is usually set when verbose output is turned off
+		// we want to output the "Downloaded" statement anyways
+		if stdout == ioutil.Discard {
+			fmt.Printf("Downloaded %s\n", filename)
+		} else {
+			fmt.Fprintf(stdout, "Downloaded %s\n", filename)
+		}
 	}()
 	fmt.Fprintf(stdout, "Fetching %s\n", filename)
 	_, err = file.WriteTo(osfile) // download the contents to the file
