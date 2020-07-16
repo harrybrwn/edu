@@ -164,6 +164,7 @@ type crnWatcher struct {
 }
 
 func (cw *crnWatcher) Watch() error {
+	viper.ReadInConfig()
 	err := checkCRNList(cw.crns, cw.subject, cw.flags)
 	if err != nil {
 		if cw.verbose {

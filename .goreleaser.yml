@@ -72,6 +72,7 @@ brews:
 
 snapcrafts:
   - <<: *description
+    name: edu
     name_template: '{{ .ProjectName }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
     summary: Command line tool for managing school stuff
     grade: stable
