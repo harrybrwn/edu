@@ -60,8 +60,9 @@ func genServiceCmd() *cobra.Command {
 				defer osfile.Close()
 				file = osfile
 			} else {
+				osfile, err := os.Open("./edu.service")
 				// osfile, err := os.Open("/etc/systemd/system/edu.service")
-				osfile, err := os.Create("/etc/systemd/system/edu.service")
+				// osfile, err := os.Create("/etc/systemd/system/edu.service")
 				// osfile, err := os.OpenFile("/etc/systemd/system/edu.service",
 				if err != nil {
 					return err

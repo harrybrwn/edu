@@ -5,6 +5,7 @@ edu
 
 *.txt
 *.json
+*.service
 
 /scripts
 /upload.sh

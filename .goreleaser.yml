@@ -57,7 +57,7 @@ nfpms:
 brews:
   - <<: *description
     name: edu
-    github:
+    tap:
       owner: harrybrwn
       name: homebrew-tap
     homepage: https://github.com/harrybrwn/edu
