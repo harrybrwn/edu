@@ -3,10 +3,20 @@ package internal
 import (
 	"io"
 	"os"
+	"runtime"
 
 	"github.com/harrybrwn/go-canvas"
 	table "github.com/olekukonko/tablewriter"
 )
+
+// Homedir will get the correct home directory
+func Homedir() string {
+	home := os.Getenv("HOME")
+	if home == "" && runtime.GOOS == "windows" {
+		return os.Getenv("USERPROFILE")
+	}
+	return home
+}
 
 // Error is an error
 type Error struct {

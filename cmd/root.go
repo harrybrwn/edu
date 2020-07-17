@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/gen2brain/beeep"
 	"github.com/harrybrwn/edu/cmd/commands"
@@ -47,7 +48,8 @@ func Execute() (err error) {
 	log.SetOutput(Logger)
 	err = viper.ReadInConfig()
 	if _, ok := err.(viper.ConfigFileNotFoundError); err != nil && ok {
-		err = createDefaultConfigFile("$HOME/.config/edu", "config.yml")
+		home := internal.Homedir()
+		err = createDefaultConfigFile(filepath.Join(home, ".config/edu"), "config.yml")
 		if err != nil {
 			return err
 		}
@@ -75,22 +77,21 @@ func init() {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yml")
 
-	viper.AddConfigPath("$XDG_CONFIG_HOME/edu")
-	viper.AddConfigPath("$HOME/.config/edu")
-	viper.AddConfigPath("$HOME/.edu")
-	viper.AddConfigPath("$XDG_CONFIG_HOME/canvas")
-	viper.AddConfigPath("$HOME/.config/canvas")
-	viper.AddConfigPath("$HOME/.canvas")
+	if runtime.GOOS != "windows" {
+		viper.AddConfigPath("$XDG_CONFIG_HOME/edu")
+	}
+	home := internal.Homedir()
+	viper.AddConfigPath(filepath.Join(home, "./config/edu"))
+	viper.AddConfigPath(filepath.Join(home, "./edu"))
 
 	viper.SetEnvPrefix("edu")
 	viper.BindEnv("host")
 	viper.BindEnv("canvas_token", "CANVAS_TOKEN")
 	viper.BindEnv("twilio_sid", "TWILIO_SID")
 	viper.BindEnv("twilio_token", "TWILIO_TOKEN")
-	// viper.BindEnv("editor", "EDITOR")
 
 	viper.SetDefault("editor", os.Getenv("EDITOR"))
-	viper.SetDefault("basedir", "$HOME/.edu/files")
+	viper.SetDefault("basedir", filepath.Join(home, ".edu/files"))
 	viper.SetDefault("notifications", true)
 	viper.SetDefault("watch.duration", "12h")
 
@@ -160,8 +161,7 @@ var (
 	}
 )
 
-func createDefaultConfigFile(dir, file string) error {
-	path := os.ExpandEnv("$HOME/.config/edu")
+func createDefaultConfigFile(path, file string) error {
 	if err := internal.Mkdir(path); err != nil {
 		return fmt.Errorf("couldn't create config dir: %w", err)
 	}
