@@ -200,8 +200,11 @@ func newCourse(data []string) (*Course, error) {
 	crn, e1 := strconv.Atoi(data[0])
 	units, e2 := strconv.Atoi(data[3])
 	maxenrl, e3 := strconv.Atoi(data[10])
-	activenrl, e4 := strconv.Atoi(data[11])
-	err := errs.Chain(e1, e2, e3, e4)
+	activenrl, err := strconv.Atoi(data[11])
+	if err != nil {
+		return nil, fmt.Errorf("could not parse active enrollment: %w", err)
+	}
+	err = errs.Chain(e1, e2, e3)
 	if err != nil {
 		return nil, err
 	}
@@ -224,6 +227,7 @@ func newCourse(data []string) (*Course, error) {
 	if err != nil {
 		return nil, err
 	}
+	// parsing the course number from the course code
 	parts := strings.Split(c.Fullcode, "-")
 	if len(parts) >= 2 {
 		end := parts[1][len(parts[1])-1]
@@ -232,7 +236,7 @@ func newCourse(data []string) (*Course, error) {
 		}
 		c.Number, err = strconv.Atoi(parts[1])
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not parse course number: %w", err)
 		}
 	}
 	return c, nil
