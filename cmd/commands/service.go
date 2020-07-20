@@ -2,9 +2,9 @@ package commands
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"text/template"
 
 	"github.com/spf13/cobra"
@@ -17,7 +17,7 @@ StartLimitIntervalSec=0
 [Service]
 Type=simple
 Restart=on-failure
-RestartSec=30
+RestartSec=10
 User={{.User}}
 ExecStart={{.Bin}} registration watch -v
 
@@ -27,9 +27,9 @@ WantedBy=multi-user.target
 
 func genServiceCmd() *cobra.Command {
 	var (
-		filename string
-		file     io.Writer = os.Stdout
+		filename string = "./edu.service"
 		restart  bool
+		install  bool
 	)
 	c := &cobra.Command{
 		Use:    "service",
@@ -40,6 +40,7 @@ func genServiceCmd() *cobra.Command {
 				fmt.Println("restarting service")
 				return exec.Command("sudo", "systemctl", "restart", "edu").Run()
 			}
+
 			data := struct {
 				User, Bin string
 			}{}
@@ -52,33 +53,49 @@ func genServiceCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if filename != "" {
-				osfile, err := os.Open(filename)
-				if err != nil {
-					return err
-				}
-				defer osfile.Close()
-				file = osfile
-			} else {
-				osfile, err := os.Open("./edu.service")
-				// osfile, err := os.Open("/etc/systemd/system/edu.service")
-				// osfile, err := os.Create("/etc/systemd/system/edu.service")
-				// osfile, err := os.OpenFile("/etc/systemd/system/edu.service",
-				if err != nil {
-					return err
-				}
-				defer osfile.Close()
-				file = osfile
-			}
 
+			file, err := os.Create(filename)
+			if err != nil {
+				return fmt.Errorf("could not create %s: %w", filename, err)
+			}
+			defer file.Close()
 			if err = tmpl.Execute(file, &data); err != nil {
 				return err
 			}
-			return exec.Command("sudo", "systemctl", "enable", "edu").Run()
+			if !install {
+				return nil
+			}
+			return createService(filename)
 		},
 	}
 	flags := c.Flags()
-	flags.BoolVarP(&restart, "restart", "r", restart, "restart the systemd service")
-	flags.StringVarP(&filename, "file", "f", "", "write the service to a file")
+	flags.BoolVarP(&restart, "restart", "r", restart, "Restart the systemd service")
+	flags.BoolVarP(&install, "install", "i", install, "Install a systemd service.")
+	flags.StringVarP(&filename, "file", "f", filename, "Write the service to a file")
 	return c
+}
+
+func createService(filename string) error {
+	_, name := filepath.Split(filename)
+	systemdfile := filepath.Join("/etc/systemd/system", name)
+	err := system("sudo", "install", filename, systemdfile)
+	if err != nil {
+		return fmt.Errorf("could not copy service file: %w", err)
+	}
+	err = system("sudo", "systemctl", "enable", "edu")
+	if err != nil {
+		return fmt.Errorf("could not enable service: %w", err)
+	}
+	err = system("sudo", "systemctl", "start", "edu")
+	if err != nil {
+		return fmt.Errorf("could not start service: %w", err)
+	}
+	return nil
+}
+
+func system(command string, args ...string) error {
+	cmd := exec.Command(command, args...)
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+	return cmd.Run()
 }

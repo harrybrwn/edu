@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/harrybrwn/edu/cmd/internal"
-	"github.com/harrybrwn/edu/pkg/files"
+	"github.com/harrybrwn/edu/cmd/internal/files"
 	"github.com/harrybrwn/errs"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cobra"
@@ -29,7 +29,7 @@ func newUpdateCmd() *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:   "update",
-		Short: "Download all the files from canvas",
+		Short: "Download all your files from canvas",
 		RunE:  uc.run,
 	}
 	flags := cmd.Flags()
@@ -44,7 +44,7 @@ func newUpdateCmd() *cobra.Command {
 func (uc *updateCmd) run(cmd *cobra.Command, args []string) (err error) {
 	courses, err := internal.GetCourses(uc.all)
 	if err != nil {
-		return err
+		return internal.HandleAuthErr(err)
 	}
 	dl := files.NewDownloader(uc.basedir)
 	if uc.verbose {

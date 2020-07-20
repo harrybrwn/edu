@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 
 	"github.com/harrybrwn/edu/cmd/internal"
 	"github.com/harrybrwn/edu/cmd/internal/opts"
@@ -18,15 +19,18 @@ func All(globals *opts.Global) []*cobra.Command {
 	canvasCmd.AddCommand(
 		canvasCommands(globals)...,
 	)
-	return []*cobra.Command{
+	all := []*cobra.Command{
 		newCoursesCmd(globals),
 		newConfigCmd(),
 		canvasCmd,
 		newUpdateCmd(),
 		newRegistrationCmd(globals),
 		newTextCmd(),
-		genServiceCmd(),
 	}
+	if runtime.GOOS == "linux" {
+		all = append(all, genServiceCmd())
+	}
+	return all
 }
 
 func newCoursesCmd(opts *opts.Global) *cobra.Command {
@@ -42,7 +46,7 @@ func newCoursesCmd(opts *opts.Global) *cobra.Command {
 			)
 			courses, err = internal.GetCourses(all)
 			if err != nil {
-				return err
+				return internal.HandleAuthErr(err)
 			}
 			tab := internal.NewTable(cmd.OutOrStderr())
 			header := []string{"id", "name", "uuid", "code", "ends"}
@@ -63,7 +67,7 @@ func newConfigCmd() *cobra.Command {
 	var file, edit bool
 	cmd := &cobra.Command{
 		Use:     "config",
-		Short:   "Manage configuration",
+		Short:   "Manage configuration variables.",
 		Aliases: []string{"conf"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			f := viper.ConfigFileUsed()

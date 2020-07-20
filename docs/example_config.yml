@@ -1,0 +1,62 @@
+# Most schools have a custom canvas host, the program will still work without
+# setting this variable
+# default: canvas.instructure.com
+host: catcourses.ucmerced.edu
+# Set the editor command used for editing the config file from the
+# `edu config --edit` command
+# default: ""
+editor: vim
+# This is the root location for file downloads when running
+# the `edu update` command
+# default: ~/.edu/files
+basedir: $HOME/school
+# This is your canvas api token. The program will also look for
+# the '$CANVAS_TOKEN' environment variable.
+# default: ""
+token: '<your canvas token>'
+# This is an object holding your default settings for the
+# registration command and all of it's sub-commands.
+registration:
+  term: 'fall'
+  year: 2020
+
+watch:
+  duration: '1h10m' # 1 hour and 10 minutes
+  crns: [30313, 34936, 34931, 34994, 35502, 30151]
+  term: 'fall'
+  year: 2021
+
+replacements:
+  - pattern: "[fFsS][0-9]{2}-([a-zA-Z]{1,5}) (0)?([0-9]+[A-Z]?) .*?/"
+    replacement: "all/$1$3/"
+    lower: true
+  - pattern: "[sS][uU]?20-([a-zA-Z]{1,5}) (0){0,1}([0-9]+) .*?/"
+    replacement: "$1$3/"
+    lower: true
+  - pattern: \+
+    replacement: " "
+  - pattern: \.text$
+    replacement: ".txt"
+course-replacements:
+  'CSE 100 10':
+    - pattern: "[Ll]abs"
+      replacement: "labs"
+  'CSE 031 01':
+    - pattern: "[Ll]ab #"
+      replacement: "lab"
+    - pattern: Video Lectures
+      replacement: vid_lectures
+    - pattern: " "
+      replacement: "_"
+    - pattern: "(.*)"
+      replacement: $1
+      lower: true
+  'COGS 125 01/CSE 175 01':
+    - pattern: "cogs125/CSE 175 01"
+      replacement: "cogs125-cse175"
+  'GASP 030C 01':
+    - pattern: 'F18-GASP 030C 01'
+      replacement: 'gasp30c'
+  'MATH 032 01':
+    - pattern: ' '
+      replacement: '_'

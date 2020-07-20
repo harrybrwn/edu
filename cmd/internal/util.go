@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"runtime"
@@ -82,4 +83,15 @@ func SetTableHeader(t *table.Table, header []string, color bool) {
 		}
 		t.SetHeaderColor(headercolors...)
 	}
+}
+
+// HandleAuthErr will handle a canvas auth error
+// and give a more relevant error message.
+func HandleAuthErr(err error) error {
+	autherr, ok := err.(*canvas.AuthError)
+	// i'm so sorry for string comparison error handling i know its bad
+	if ok && autherr.Errors[0].Message == "Invalid access token." {
+		return fmt.Errorf("%w (set 'token' in config file or '$CANVAS_TOKEN' env variable)", autherr)
+	}
+	return err
 }

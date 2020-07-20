@@ -11,8 +11,8 @@ import (
 
 	"github.com/gen2brain/beeep"
 	"github.com/harrybrwn/edu/cmd/internal"
+	"github.com/harrybrwn/edu/cmd/internal/files"
 	"github.com/harrybrwn/edu/cmd/internal/opts"
-	"github.com/harrybrwn/edu/pkg/info"
 	"github.com/harrybrwn/edu/pkg/term"
 	"github.com/harrybrwn/edu/school/ucmerced/ucm"
 	"github.com/harrybrwn/errs"
@@ -58,6 +58,8 @@ func newRegistrationCmd(globals *opts.Global) *cobra.Command {
 		Long: `Use the 'registration' command to get information on class
 registration information.`,
 		Aliases: []string{"reg", "register"},
+		Example: "  $ edu registration cse 100 --term=fall\n" +
+			"  $ edu reg --open --year=2021 --term=summer WRI 10",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if sflags.year == 0 {
 				return errs.New("no year given")
@@ -175,6 +177,33 @@ func (cw *crnWatcher) Watch() error {
 	return nil
 }
 
+func watchFiles() error {
+	basedir := viper.GetString("basedir")
+	courses, err := internal.GetCourses(false)
+	if err != nil {
+		return internal.HandleAuthErr(err)
+	}
+	dl := files.NewDownloader(basedir)
+	coursereps, replacements, err := getReplacements()
+	if err != nil {
+		return err
+	}
+	for _, course := range courses {
+		if course.AccessRestrictedByDate {
+			continue
+		}
+		reps, ok := coursereps[course.CourseCode]
+		if !ok {
+			reps = replacements
+		} else {
+			reps = append(replacements, reps...)
+		}
+		dl.Download(course, reps)
+	}
+	dl.Wait()
+	return nil
+}
+
 func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
 	var (
 		subject string
@@ -201,7 +230,7 @@ func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
 			}
 			crns = append(crns, viper.GetIntSlice("watch.crns")...)
 			if len(crns) < 1 {
-				return errors.New("no crns to check")
+				return errors.New("no crns to check (see 'edu config' watch settings)")
 			}
 
 			var duration time.Duration
@@ -219,12 +248,7 @@ func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
 				},
 			}
 			if viper.GetBool("watch.files") {
-				watches = append(watches, watcherFunc(func() error {
-					return nil
-				}))
-			}
-			if !viper.GetBool("no_runtime_info") {
-				go info.Intrp()
+				watches = append(watches, watcherFunc(watchFiles))
 			}
 			for {
 				for _, wt := range watches {

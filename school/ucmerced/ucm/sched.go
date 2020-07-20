@@ -3,6 +3,7 @@ package ucm
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -197,16 +198,30 @@ func newCourse(data []string) (*Course, error) {
 	if len(data) != 13 {
 		return nil, fmt.Errorf("cannot create a course with %d values", len(data))
 	}
-	crn, e1 := strconv.Atoi(data[0])
-	units, e2 := strconv.Atoi(data[3])
-	maxenrl, e3 := strconv.Atoi(data[10])
+	crn, err := strconv.Atoi(data[0])
+	if err != nil {
+		err = fmt.Errorf("could not parse crn: %w", err)
+		log.Println(err)
+		return nil, err
+	}
+	units, err := strconv.Atoi(data[3])
+	if err != nil {
+		err = fmt.Errorf("could not parse units: %w", err)
+		log.Println(err)
+		return nil, err
+	}
+	maxenrl, err := strconv.Atoi(data[10])
+	if err != nil {
+		err = fmt.Errorf("could not parse max enrollment: %w", err)
+		log.Println(err)
+		maxenrl = 0
+	}
 	activenrl, err := strconv.Atoi(data[11])
 	if err != nil {
-		return nil, fmt.Errorf("could not parse active enrollment: %w", err)
-	}
-	err = errs.Chain(e1, e2, e3)
-	if err != nil {
-		return nil, err
+		err = fmt.Errorf("could not parse active enrollment: %w", err)
+		log.Println(err)
+		activenrl = 0
+		// return nil, err
 	}
 	timeStr := data[6]
 	c := &Course{

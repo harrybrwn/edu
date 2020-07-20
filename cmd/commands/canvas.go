@@ -103,7 +103,7 @@ func newDueCmd(flags *opts.Global) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			courses, err := internal.GetCourses(false)
 			if err != nil {
-				return err
+				return internal.HandleAuthErr(err)
 			}
 			if len(args) > 0 {
 				for _, course := range courses {
@@ -176,7 +176,7 @@ func newFilesCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			courses, err := ff.getCourses()
 			if err != nil {
-				return err
+				return internal.HandleAuthErr(err)
 			}
 			opts := []canvas.Option{canvas.SortOpt(sortby...)}
 			opts = append(opts, ff.options()...)
@@ -217,7 +217,7 @@ func assignmentsCmd() *cobra.Command {
 			}
 			courses, err := internal.GetCourses(true)
 			if err != nil {
-				return err
+				return internal.HandleAuthErr(err)
 			}
 			for _, course := range courses {
 				as, err := course.Assignment(id)
@@ -301,7 +301,7 @@ func upload(filename, uploadname string) (err error) {
 		opts = append(opts, canvas.Opt("parent_folder_path", dir))
 	}
 	_, err = canvas.UploadFile(uploadname, file, opts...)
-	return err
+	return internal.HandleAuthErr(err)
 }
 
 type iter interface {

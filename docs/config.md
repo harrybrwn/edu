@@ -32,11 +32,11 @@ replacements:
 ```
 
 #### watch
-The `watch` config field is an object that houses configuration data for the `edu watch` command.
+The `watch` config field is an object that houses configuration data for the `edu registration watch` command.
+* crns - an array of crn IDs that will be watched for open seats
 * duration - tells the `watch` command how often to repeat (default is '12h')
-* crns - an array of crn IDs that will be watched
 ```yaml
 watch:
   duration: '1h35m100ms'
-  crns: [123, 234 ,345 ,456 ,567]
+  crns: [123, 234, 345, 456, 567]
 ```
