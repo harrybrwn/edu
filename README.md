@@ -12,12 +12,12 @@ brew install harrybrwn/tap/edu
 ```
 #### Debian/Ubuntu
 ```
-curl -LO https://github.com/harrybrwn/edu/releases/download/v0.0.3/edu_0.0.3_Linux_64-bit.deb
+curl -LO https://github.com/harrybrwn/edu/releases/download/v0.0.2/edu_0.0.2_Linux_64-bit.deb
 sudo dpkg -i edu_0.0.3_Linux_64-bit.deb
 ```
 #### Rpm
 ```
-curl -LO https://github.com/harrybrwn/edu/releases/download/v0.0.3/edu_0.0.3_Linux_64-bit.rpm
+curl -LO https://github.com/harrybrwn/edu/releases/download/v0.0.2/edu_0.0.2_Linux_64-bit.rpm
 sudo rpm -i edu_0.0.3_Linux_64-bit.rpm
 ```
 #### Windows
