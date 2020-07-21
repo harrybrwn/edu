@@ -78,7 +78,7 @@ snapcrafts:
     summary: Command line tool for managing school stuff
     grade: stable
     confinement: classic
-    publish: true
+    publish: false
 
 checksum:
   name_template: 'checksums.txt'
