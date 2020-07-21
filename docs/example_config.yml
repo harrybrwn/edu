@@ -2,41 +2,77 @@
 # setting this variable
 # default: canvas.instructure.com
 host: catcourses.ucmerced.edu
+
 # Set the editor command used for editing the config file from the
 # `edu config --edit` command
 # default: ""
 editor: vim
+
 # This is the root location for file downloads when running
 # the `edu update` command
 # default: ~/.edu/files
 basedir: $HOME/school
+
 # This is your canvas api token. The program will also look for
 # the '$CANVAS_TOKEN' environment variable.
 # default: ""
 token: '<your canvas token>'
+
+# Various commands may send a desktop notification,
+# this variable lets you turn off this functionality
+# default: true
+notifications: false
+
 # This is an object holding your default settings for the
 # registration command and all of it's sub-commands.
 registration:
+  # term should be one of "fall"|"spring"|"summer"
+  # default: ""
   term: 'fall'
+  # year should be the year being checked by registration
+  # default: 0
   year: 2020
 
+# watch holds variables for the `edu registration watch` command.
+# In general, watch is the long running portion of the cli
+# where it will scan for changes in the school schedule or download
+# new files from canvas.
 watch:
-  duration: '1h10m' # 1 hour and 10 minutes
+  # duration is the time between each iteration
+  # default: '12h'
+  duration: '1h10m34ms' # 1 hour, 10 minutes, and 34 milliseconds
+  # This is a list of CRNs that will be checked for open
+  # seats upon every iteration of the watch
+  # note: this only supports UC Merced for now
+  # default: []
   crns: [30313, 34936, 34931, 34994, 35502, 30151]
+  # see registration.term
   term: 'fall'
+  # see registration.year
   year: 2021
 
+# replacements is a list of Regex patterns that can change file
+# download paths.
+# For an in-depth overview of the specific regular expression
+# syntax see https://golang.org/pkg/regexp/syntax/.
 replacements:
-  - pattern: "[fFsS][0-9]{2}-([a-zA-Z]{1,5}) (0)?([0-9]+[A-Z]?) .*?/"
-    replacement: "all/$1$3/"
+  -
+    # pattern is the regex pattern which is applied to the file path
+    pattern: "[fFsS][0-9]{2}-([a-zA-Z]{1,5}) (0)?([0-9]+[A-Z]?) .*?/"
+    # replacement is a string that will replace the
+    # pattern match. You can reference any capture group using $<group num>
+    replacement: "all/$1$3/" # $1 references the first group and $3 references the third
+    # lower will take the whole match string and lowercase it
     lower: true
   - pattern: "[sS][uU]?20-([a-zA-Z]{1,5}) (0){0,1}([0-9]+) .*?/"
     replacement: "$1$3/"
     lower: true
-  - pattern: \+
-    replacement: " "
-  - pattern: \.text$
-    replacement: ".txt"
+
+# course-replacements is the same as replacements except
+# you can choose to apply each pattern to one canvas course
+# using its name as used by canvas
+# Note: all patterns in course-replacements are applied after
+# the patterns in replacements
 course-replacements:
   'CSE 100 10':
     - pattern: "[Ll]abs"
@@ -54,9 +90,6 @@ course-replacements:
   'COGS 125 01/CSE 175 01':
     - pattern: "cogs125/CSE 175 01"
       replacement: "cogs125-cse175"
-  'GASP 030C 01':
-    - pattern: 'F18-GASP 030C 01'
-      replacement: 'gasp30c'
   'MATH 032 01':
     - pattern: ' '
       replacement: '_'

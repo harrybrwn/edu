@@ -2,6 +2,8 @@
 
 Configuration for this program uses [yaml](https://yaml.org/). To find the configuration file, run `edu config -f` and that will output the path to the config file currently being used. Or use `edu config -e` to edit it with your favorite text editor (hint use the `$EDITOR` environment variable).
 
+For more examples see [my example config](/docs/exmaple_config.yml)
+
 #### Token
 This is the API token for the canvas api. For directions on getting a student api token look [here](https://community.canvaslms.com/docs/DOC-16005-42121018197).
 You also have the option of setting this as an environment variable called `$CANVAS_TOKEN`.

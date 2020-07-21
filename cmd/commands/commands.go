@@ -80,6 +80,9 @@ func newConfigCmd() *cobra.Command {
 					return errs.New("no config file found")
 				}
 				editor := viper.GetString("editor")
+				if editor == "" {
+					return errs.New("no editor set (use $EDITOR or set it in the config)")
+				}
 				ex := exec.Command(editor, f)
 				ex.Stdout, ex.Stderr, ex.Stdin = os.Stdout, os.Stderr, os.Stdin
 				return ex.Run()

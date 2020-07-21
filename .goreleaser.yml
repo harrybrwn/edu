@@ -3,6 +3,7 @@ project_name: edu
 before:
   hooks:
     - go mod tidy
+    - go generate ./...
 
 release:
   github:
@@ -72,12 +73,12 @@ brews:
 
 snapcrafts:
   - <<: *description
-    name: edu
+    name: go-edu
     name_template: '{{ .ProjectName }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
     summary: Command line tool for managing school stuff
     grade: stable
-    confinement: strict
-    publish: false
+    confinement: classic
+    publish: true
 
 checksum:
   name_template: 'checksums.txt'
