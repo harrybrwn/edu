@@ -3,9 +3,7 @@ package term
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
-	"runtime"
 )
 
 var (
@@ -40,14 +38,8 @@ const (
 )
 
 func init() {
-	switch runtime.GOOS {
-	case "windows":
-		Output = ioutil.Discard
-		escape = ""
-	default:
-		Output = os.Stdout
-		escape = "\x1b"
-	}
+	escape = "\x1b"
+	Output = os.Stdout
 }
 
 // Color256 outputs s in the 256 color format.
