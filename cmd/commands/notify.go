@@ -6,15 +6,15 @@ import (
 	"log"
 	"strings"
 
+	"github.com/harrybrwn/edu/cmd/internal/config"
 	"github.com/harrybrwn/edu/pkg/twilio"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func newTextCmd() *cobra.Command {
 	var (
 		to   string
-		from = viper.GetString("twilio_number")
+		from = config.GetString("twilio.number")
 		file string
 	)
 	c := &cobra.Command{
@@ -47,8 +47,8 @@ func newTextCmd() *cobra.Command {
 				return errors.New("no number to send from")
 			}
 			twilio := twilio.NewClient(
-				viper.GetString("twilio_sid"),
-				viper.GetString("twilio_token"),
+				config.GetString("twilio.sid"),
+				config.GetString("twilio.token"),
 			)
 			log.Printf("sending text %s to %s\n", from, to)
 			twilio.SetSender(from)

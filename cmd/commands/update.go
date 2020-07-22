@@ -6,11 +6,9 @@ import (
 	"strings"
 
 	"github.com/harrybrwn/edu/cmd/internal"
+	"github.com/harrybrwn/edu/cmd/internal/config"
 	"github.com/harrybrwn/edu/cmd/internal/files"
-	"github.com/harrybrwn/errs"
-	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 type updateCmd struct {
@@ -25,7 +23,7 @@ func newUpdateCmd() *cobra.Command {
 		all:     false,
 		verbose: false,
 		sortBy:  []string{"created_at"},
-		basedir: os.ExpandEnv(viper.GetString("basedir")),
+		basedir: os.ExpandEnv(config.GetString("basedir")),
 	}
 	cmd := &cobra.Command{
 		Use:   "update",
@@ -50,60 +48,28 @@ func (uc *updateCmd) run(cmd *cobra.Command, args []string) (err error) {
 	if uc.verbose {
 		dl.Stdout = os.Stdout
 	}
-	coursereps, replacements, err := getReplacements()
-	if err != nil {
-		return err
-	}
 
 	var fn = dl.Download
 	if uc.testPatters {
 		fn = dl.CheckReplacements
 	}
+	courseReps := upperMapKeys(Conf.CourseReplacements)
 
 	for _, course := range courses {
 		if course.AccessRestrictedByDate {
 			continue
 		}
-		reps, ok := coursereps[course.CourseCode]
+		reps, ok := courseReps[course.CourseCode]
 		if !ok {
-			reps = replacements
+			reps = Conf.Replacements
 		} else {
-			reps = append(replacements, reps...)
+			reps = append(Conf.Replacements, reps...)
 		}
 		fn(course, reps)
 	}
 	dl.Wait()
 	fmt.Println("done.")
 	return nil
-}
-
-func getReplacements() (map[string][]files.Replacement, []files.Replacement, error) {
-	filepats := viperTryGetKeys([]string{
-		"replacements",
-		"file-patterns",
-		"filepatterns",
-		"replacement-patterns",
-	})
-	reps := make([]files.Replacement, 0)
-	courseReps := make(map[string][]files.Replacement)
-	coursePats := viperTryGetKeys([]string{"course-replacements", "course_replacements"})
-
-	err := errs.Pair(
-		mapstructure.Decode(filepats, &reps),
-		mapstructure.Decode(coursePats, &courseReps),
-	)
-	return upperMapKeys(courseReps), reps, err
-}
-
-func viperTryGetKeys(keys []string) interface{} {
-	var result interface{}
-	for _, key := range keys {
-		result = viper.Get(key)
-		if result != nil {
-			break
-		}
-	}
-	return result
 }
 
 func upperMapKeys(m map[string][]files.Replacement) map[string][]files.Replacement {

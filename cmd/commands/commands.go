@@ -7,35 +7,43 @@ import (
 	"runtime"
 
 	"github.com/harrybrwn/edu/cmd/internal"
+	"github.com/harrybrwn/edu/cmd/internal/config"
 	"github.com/harrybrwn/edu/cmd/internal/files"
 	"github.com/harrybrwn/edu/cmd/internal/opts"
 	"github.com/harrybrwn/errs"
 	"github.com/harrybrwn/go-canvas"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
+
+// Conf is the global config
+var Conf = &Config{}
 
 // Config is the main configuration struct
 type Config struct {
-	Host          string `default:"canvas.instructure.com" yaml:"host"`
-	Editor        string `yaml:"editor"`
-	BaseDir       string `default:"$HOME/.edu/files" yaml:"basedir"`
-	Token         string `yaml:"token"`
-	TwilioNumber  string `yaml:"twilio_number"`
-	Notifications bool   `default:"true"`
+	Host         string `yaml:"host" default:"canvas.instructure.com"`
+	Editor       string `yaml:"editor" env:"EDITOR"`
+	BaseDir      string `yaml:"basedir" default:"$HOME/.edu/files"`
+	Token        string `yaml:"token" env:"CANVAS_TOKEN"`
+	TwilioNumber string `yaml:"twilio_number"`
+	Twilio       struct {
+		SID    string `yaml:"sid" env:"TWILIO_SID"`
+		Token  string `yaml:"token" env:"TWILIO_TOKEN"`
+		Number string `yaml:"number"`
+	} `yaml:"twilio"`
+	Notifications bool `yaml:"notifications" default:"true"`
 	Registration  struct {
 		Term string `yaml:"term"`
 		Year int    `yaml:"year"`
 	} `yaml:"registration"`
 	Watch struct {
-		Duration string `default:"12h" yaml:"duration"`
+		Duration string `yaml:"duration" default:"12h"`
 		CRNs     []int  `yaml:"crns"`
 		Term     string `yaml:"term"`
 		Year     int    `yaml:"year"`
 		Files    bool   `yaml:"files"`
 	} `yaml:"watch"`
-	Replacements       []files.Replacement          `yaml:"replacements"`
-	CourseReplacements map[string]files.Replacement `yaml:"course-replacements"`
+	Replacements       []files.Replacement            `yaml:"replacements"`
+	CourseReplacements map[string][]files.Replacement `yaml:"course-replacements"`
 }
 
 // All returns all the commands.
@@ -94,7 +102,7 @@ func newConfigCmd() *cobra.Command {
 		Short:   "Manage configuration variables.",
 		Aliases: []string{"conf"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			f := viper.ConfigFileUsed()
+			f := config.FileUsed()
 			if file {
 				fmt.Println(f)
 				return nil
@@ -103,7 +111,7 @@ func newConfigCmd() *cobra.Command {
 				if f == "" {
 					return errs.New("no config file found")
 				}
-				editor := viper.GetString("editor")
+				editor := config.GetString("editor")
 				if editor == "" {
 					return errs.New("no editor set (use $EDITOR or set it in the config)")
 				}
@@ -118,7 +126,7 @@ func newConfigCmd() *cobra.Command {
 		Use: "get", Short: "Get a config variable",
 		Run: func(c *cobra.Command, args []string) {
 			for _, arg := range args {
-				c.Println(viper.Get(arg))
+				c.Println(config.Get(arg))
 			}
 		}})
 	cmd.Flags().BoolVarP(&edit, "edit", "e", false, "edit the config file")

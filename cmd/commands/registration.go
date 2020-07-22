@@ -11,6 +11,7 @@ import (
 
 	"github.com/gen2brain/beeep"
 	"github.com/harrybrwn/edu/cmd/internal"
+	"github.com/harrybrwn/edu/cmd/internal/config"
 	"github.com/harrybrwn/edu/cmd/internal/files"
 	"github.com/harrybrwn/edu/cmd/internal/opts"
 	"github.com/harrybrwn/edu/cmd/internal/watch"
@@ -20,7 +21,6 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 )
 
 type scheduleFlags struct {
@@ -49,8 +49,8 @@ var regHeader = []string{
 
 func newRegistrationCmd(globals *opts.Global) *cobra.Command {
 	var sflags = scheduleFlags{
-		term:   viper.GetString("registration.term"),
-		year:   viper.GetInt("registration.year"),
+		term:   config.GetString("registration.term"),
+		year:   config.GetInt("registration.year"),
 		Global: globals,
 	}
 	c := &cobra.Command{
@@ -120,7 +120,7 @@ func newCheckCRNCmd(sflags *scheduleFlags) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			crns := viper.GetIntSlice("crns")
+			crns := config.GetIntSlice("crns")
 			crnargs, err := stroiArr(args)
 			if err != nil {
 				return err
@@ -162,16 +162,16 @@ func (cw *crnWatcher) Watch() error {
 		subject = cw.subject
 		crns    = cw.crns
 	)
-	if viper.GetInt("watch.year") != 0 {
-		cw.flags.year = viper.GetInt("watch.year")
+	if config.GetInt("watch.year") != 0 {
+		cw.flags.year = config.GetInt("watch.year")
 	}
-	if viper.GetString("watch.term") != "" {
-		cw.flags.term = viper.GetString("watch.term")
+	if config.GetString("watch.term") != "" {
+		cw.flags.term = config.GetString("watch.term")
 	}
-	if viper.GetString("watch.subject") != "" {
-		subject = viper.GetString("watch.subject")
+	if config.GetString("watch.subject") != "" {
+		subject = config.GetString("watch.subject")
 	}
-	configCrns := viper.GetIntSlice("watch.crns")
+	configCrns := config.GetIntSlice("watch.crns")
 	if len(configCrns) > 0 {
 		crns = append(crns, configCrns...)
 	}
@@ -189,7 +189,7 @@ func (cw *crnWatcher) Watch() error {
 }
 
 func watchFiles() error {
-	basedir := viper.GetString("basedir")
+	basedir := config.GetString("basedir")
 	if basedir == "" {
 		return errors.New("cannot download files to an empty base directory")
 	}
@@ -197,20 +197,17 @@ func watchFiles() error {
 	if err != nil {
 		return internal.HandleAuthErr(err)
 	}
+	courseReps := upperMapKeys(Conf.CourseReplacements)
 	dl := files.NewDownloader(basedir)
-	coursereps, replacements, err := getReplacements()
-	if err != nil {
-		return err
-	}
 	for _, course := range courses {
 		if course.AccessRestrictedByDate {
 			continue
 		}
-		reps, ok := coursereps[course.CourseCode]
+		reps, ok := courseReps[course.CourseCode]
 		if !ok {
-			reps = replacements
+			reps = Conf.Replacements
 		} else {
-			reps = append(replacements, reps...)
+			reps = append(Conf.Replacements, reps...)
 		}
 		dl.Download(course, reps)
 	}
@@ -222,8 +219,8 @@ func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
 	var (
 		subject string
 		verbose bool
-		term    = viper.GetString("watch.term")
-		year    = viper.GetInt("watch.year")
+		term    = config.GetString("watch.term")
+		year    = config.GetInt("watch.year")
 	)
 	if term != "" {
 		sflags.term = term
@@ -243,7 +240,7 @@ func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
 				return err
 			}
 			var duration time.Duration
-			duration, err = time.ParseDuration(viper.GetString("watch.duration"))
+			duration, err = time.ParseDuration(config.GetString("watch.duration"))
 			if err != nil {
 				return err
 			}
@@ -256,7 +253,7 @@ func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
 			}
 
 			var watches = []watch.Watcher{crnWatch}
-			if viper.GetBool("watch.files") {
+			if config.GetBool("watch.files") {
 				watches = append(watches, watch.WatcherFunc(watchFiles))
 			}
 			for {
@@ -270,11 +267,11 @@ func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
 				time.Sleep(duration)
 
 				// refresh variables from config
-				if err = viper.ReadInConfig(); err != nil {
+				if err = config.ReadConfigFile(); err != nil {
 					log.Printf("could not refresh config during 'watch': %v", err)
 				}
-				if viper.GetString("watch.duration") != "" {
-					newdur, err := time.ParseDuration(viper.GetString("watch.duration"))
+				if config.GetString("watch.duration") != "" {
+					newdur, err := time.ParseDuration(config.GetString("watch.duration"))
 					if err != nil {
 						log.Printf("could not refresh duration: %v", err)
 					} else if newdur != 0 {
@@ -309,7 +306,7 @@ func checkCRNList(crns []int, subject string, sflags *scheduleFlags) error {
 	for _, crn := range openCrns {
 		msg += fmt.Sprintf("%d\n", crn)
 	}
-	if viper.GetBool("notifications") {
+	if config.GetBool("notifications") {
 		return beeep.Notify("Found Open Courses", msg, "")
 	}
 	return nil

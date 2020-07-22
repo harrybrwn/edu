@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -11,12 +10,12 @@ import (
 	"github.com/gen2brain/beeep"
 	"github.com/harrybrwn/edu/cmd/commands"
 	"github.com/harrybrwn/edu/cmd/internal"
+	"github.com/harrybrwn/edu/cmd/internal/config"
 	"github.com/harrybrwn/edu/cmd/internal/opts"
 	"github.com/harrybrwn/errs"
 	"github.com/harrybrwn/go-canvas"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
@@ -46,18 +45,13 @@ func Stop(message interface{}) {
 // Execute will execute the root comand on the cli
 func Execute() (err error) {
 	log.SetOutput(Logger)
-	err = viper.ReadInConfig()
-	if _, ok := err.(viper.ConfigFileNotFoundError); err != nil && ok {
-		home := internal.Homedir()
-		err = createDefaultConfigFile(filepath.Join(home, ".config/edu"), "config.yml")
-		if err != nil {
-			return err
-		}
-	} else if err != nil {
-		fmt.Fprintf(io.MultiWriter(os.Stderr, Logger), "Error: %v\n", err)
+	config.SetStruct(commands.Conf)
+	err = config.ReadConfigFile()
+	if err != nil {
+		return err
 	}
 
-	configfile := viper.ConfigFileUsed()
+	configfile := config.FileUsed()
 	if configfile != "" {
 		Logger.Filename = filepath.Join(filepath.Dir(configfile), "logs", "edu.log")
 	}
@@ -74,25 +68,15 @@ func Execute() (err error) {
 }
 
 func init() {
-	viper.SetConfigName("config")
-	viper.SetConfigType("yml")
+	config.SetFilename("config.yml")
+	config.SetType("yaml")
+
 	if runtime.GOOS != "windows" {
-		viper.AddConfigPath("$XDG_CONFIG_HOME/edu")
+		config.AddPath("$XDG_CONFIG_HOME/edu")
 	}
 	home := internal.Homedir()
-	viper.AddConfigPath(filepath.Join(home, "./config/edu"))
-	viper.AddConfigPath(filepath.Join(home, "./edu"))
-
-	viper.SetEnvPrefix("edu")
-	viper.BindEnv("host")
-	viper.BindEnv("canvas_token", "CANVAS_TOKEN")
-	viper.BindEnv("twilio_sid", "TWILIO_SID")
-	viper.BindEnv("twilio_token", "TWILIO_TOKEN")
-
-	viper.SetDefault("editor", os.Getenv("EDITOR"))
-	viper.SetDefault("basedir", filepath.Join(home, ".edu/files"))
-	viper.SetDefault("notifications", true)
-	viper.SetDefault("watch.duration", "12h")
+	config.AddPath(filepath.Join(home, "./.config/edu"))
+	config.AddPath(filepath.Join(home, "./.edu"))
 
 	beeep.DefaultDuration = 800
 }
@@ -104,21 +88,15 @@ var (
 		SilenceUsage:  true,
 		Version:       version,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			host := viper.GetString("host")
+			host := config.GetString("host")
 			if host != "" {
 				canvas.DefaultHost = host
 			}
-			token := viper.GetString("token")
-			if token != "" {
-				canvas.SetToken(os.ExpandEnv(token))
-			} else {
-				viper.Set("token", viper.GetString("canvas_token"))
-				token = os.ExpandEnv(viper.GetString("token"))
-				canvas.SetToken(token)
-			}
+			token := config.GetString("token")
 			if token == "" {
 				log.Println("no canvas api token")
 			}
+			canvas.SetToken(token)
 			canvas.ConcurrentErrorHandler = errorHandler
 		},
 	}
@@ -159,16 +137,6 @@ var (
 		},
 	}
 )
-
-func createDefaultConfigFile(path, file string) error {
-	if err := internal.Mkdir(path); err != nil {
-		return fmt.Errorf("couldn't create config dir: %w", err)
-	}
-	fullpath := filepath.Join(path, file)
-	log.Println("setting up config file at", fullpath)
-	viper.SetConfigFile(fullpath)
-	return nil
-}
 
 func errorMessage(err error) {
 	switch err.(type) {

@@ -11,8 +11,8 @@ import (
 	"sync"
 	"text/template"
 
+	"github.com/harrybrwn/edu/cmd/internal/config"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 const serviceTemplate = `[Unit]
@@ -64,7 +64,7 @@ func genServiceCmd() *cobra.Command {
 				User, Bin   string
 				CanvasToken string
 			}{
-				CanvasToken: os.ExpandEnv(viper.GetString("token")),
+				CanvasToken: os.ExpandEnv(config.GetString("token")),
 				User:        os.Getenv("USER"),
 			}
 			data.Bin, err = os.Executable()

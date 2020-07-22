@@ -133,7 +133,10 @@ func Get(key string) interface{} {
 // Get will get a variable by key
 func (c *Config) Get(key string) interface{} {
 	keys := strings.Split(key, ".")
-	_, val := findKey(reflect.ValueOf(c.config).Elem(), keys)
+	ok, _, val := findKey(reflect.ValueOf(c.config).Elem(), keys)
+	if !ok {
+		return nil
+	}
 	return val.Interface()
 }
 
@@ -147,26 +150,69 @@ func GetString(key string) string {
 // return it as a string
 func (c *Config) GetString(key string) string {
 	keys := strings.Split(key, ".")
-	_, val := findKey(reflect.ValueOf(c.config).Elem(), keys)
+	_, _, val := findKey(reflect.ValueOf(c.config).Elem(), keys)
 	return val.String()
 }
 
-func findKey(val reflect.Value, keyPath []string) (*reflect.StructField, reflect.Value) {
+// GetInt will get the int value of a key
+func GetInt(key string) int {
+	return defaultConfig.GetInt(key)
+}
+
+// GetInt will get the int value of a key
+func (c *Config) GetInt(key string) int {
+	keys := strings.Split(key, ".")
+	_, _, val := findKey(reflect.ValueOf(c.config).Elem(), keys)
+	return int(val.Int())
+}
+
+// GetBool will get the boolean value at the given key
+func GetBool(key string) bool {
+	return defaultConfig.GetBool(key)
+}
+
+// GetBool will get the boolean value at the given key
+func (c *Config) GetBool(key string) bool {
+	keys := strings.Split(key, ".")
+	_, _, val := findKey(reflect.ValueOf(c.config).Elem(), keys)
+	return val.Bool()
+}
+
+// GetIntSlice will get a slice of ints from a key
+func GetIntSlice(key string) []int {
+	return defaultConfig.GetIntSlice(key)
+}
+
+// GetIntSlice will get a slice of ints from a key
+func (c *Config) GetIntSlice(key string) []int {
+	keys := strings.Split(key, ".")
+	_, _, val := findKey(reflect.ValueOf(c.config).Elem(), keys)
+	return val.Interface().([]int)
+}
+
+func findKey(val reflect.Value, keyPath []string) (bool, *reflect.StructField, reflect.Value) {
 	typ := val.Type()
 	for i := 0; i < typ.NumField(); i++ {
 		typFld := typ.Field(i)
 		if isCorrectLabel(keyPath[0], typFld) {
-			if deflt := typFld.Tag.Get("default"); deflt != "" {
-				return &typFld, typedDefaultValue(&typFld, deflt)
-			}
+			value := val.Field(i)
 			if len(keyPath) > 1 {
-				structField, value := findKey(val.Field(i), keyPath[1:])
-				return structField, value
+				ok, structField, value := findKey(value, keyPath[1:])
+				return ok, structField, value
 			}
-			return &typFld, val.Field(i)
+			if isZero(value) {
+				deflt := typFld.Tag.Get("default")
+				env := typFld.Tag.Get("env")
+				if deflt != "" {
+					return true, &typFld, typedDefaultValue(&typFld, deflt)
+				} else if env != "" {
+					return true, &typFld, typedDefaultValue(&typFld, os.Getenv(env))
+				}
+			}
+			return true, &typFld, value
 		}
 	}
-	return nil, reflect.ValueOf(nil)
+	return false, nil, reflect.ValueOf(nil)
 }
 
 func isCorrectLabel(key string, field reflect.StructField) bool {
@@ -174,6 +220,10 @@ func isCorrectLabel(key string, field reflect.StructField) bool {
 		key == field.Tag.Get("config") ||
 		key == field.Tag.Get("yaml") ||
 		key == field.Tag.Get("json")
+}
+
+func isZero(val reflect.Value) bool {
+	return reflect.DeepEqual(val.Interface(), reflect.Zero(val.Type()).Interface())
 }
 
 func typedDefaultValue(fld *reflect.StructField, val string) reflect.Value {
