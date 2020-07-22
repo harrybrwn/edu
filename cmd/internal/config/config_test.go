@@ -46,4 +46,8 @@ func TestFind(t *testing.T) {
 			t.Error("wrong int value")
 		}
 	}
+	empty := c.GetString("empty")
+	if empty != "" {
+		t.Errorf("a non-existant key should give an empty string: got %s", empty)
+	}
 }

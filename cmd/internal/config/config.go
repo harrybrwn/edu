@@ -150,7 +150,10 @@ func GetString(key string) string {
 // return it as a string
 func (c *Config) GetString(key string) string {
 	keys := strings.Split(key, ".")
-	_, _, val := findKey(reflect.ValueOf(c.config).Elem(), keys)
+	ok, _, val := findKey(reflect.ValueOf(c.config).Elem(), keys)
+	if !ok {
+		return ""
+	}
 	return val.String()
 }
 
@@ -162,7 +165,10 @@ func GetInt(key string) int {
 // GetInt will get the int value of a key
 func (c *Config) GetInt(key string) int {
 	keys := strings.Split(key, ".")
-	_, _, val := findKey(reflect.ValueOf(c.config).Elem(), keys)
+	ok, _, val := findKey(reflect.ValueOf(c.config).Elem(), keys)
+	if !ok {
+		return 0
+	}
 	return int(val.Int())
 }
 
@@ -174,7 +180,10 @@ func GetBool(key string) bool {
 // GetBool will get the boolean value at the given key
 func (c *Config) GetBool(key string) bool {
 	keys := strings.Split(key, ".")
-	_, _, val := findKey(reflect.ValueOf(c.config).Elem(), keys)
+	ok, _, val := findKey(reflect.ValueOf(c.config).Elem(), keys)
+	if !ok {
+		return false
+	}
 	return val.Bool()
 }
 
@@ -186,7 +195,10 @@ func GetIntSlice(key string) []int {
 // GetIntSlice will get a slice of ints from a key
 func (c *Config) GetIntSlice(key string) []int {
 	keys := strings.Split(key, ".")
-	_, _, val := findKey(reflect.ValueOf(c.config).Elem(), keys)
+	ok, _, val := findKey(reflect.ValueOf(c.config).Elem(), keys)
+	if !ok {
+		return nil
+	}
 	return val.Interface().([]int)
 }
 

@@ -41,6 +41,7 @@ type Config struct {
 		Term     string `yaml:"term"`
 		Year     int    `yaml:"year"`
 		Files    bool   `yaml:"files"`
+		Subject  string `yaml:"subject"`
 	} `yaml:"watch"`
 	Replacements       []files.Replacement            `yaml:"replacements"`
 	CourseReplacements map[string][]files.Replacement `yaml:"course-replacements"`
