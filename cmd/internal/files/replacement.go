@@ -7,9 +7,9 @@ import (
 
 // Replacement is a regex pattern replacement
 type Replacement struct {
-	Pattern     string
-	Replacement string
-	Lower       bool
+	Pattern     string `yaml:"pattern"`
+	Replacement string `yaml:"replacement"`
+	Lower       bool   `yaml:"lower"`
 }
 
 // Replace will perform a replacement

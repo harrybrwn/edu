@@ -7,12 +7,36 @@ import (
 	"runtime"
 
 	"github.com/harrybrwn/edu/cmd/internal"
+	"github.com/harrybrwn/edu/cmd/internal/files"
 	"github.com/harrybrwn/edu/cmd/internal/opts"
 	"github.com/harrybrwn/errs"
 	"github.com/harrybrwn/go-canvas"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+// Config is the main configuration struct
+type Config struct {
+	Host          string `default:"canvas.instructure.com" yaml:"host"`
+	Editor        string `yaml:"editor"`
+	BaseDir       string `default:"$HOME/.edu/files" yaml:"basedir"`
+	Token         string `yaml:"token"`
+	TwilioNumber  string `yaml:"twilio_number"`
+	Notifications bool   `default:"true"`
+	Registration  struct {
+		Term string `yaml:"term"`
+		Year int    `yaml:"year"`
+	} `yaml:"registration"`
+	Watch struct {
+		Duration string `default:"12h" yaml:"duration"`
+		CRNs     []int  `yaml:"crns"`
+		Term     string `yaml:"term"`
+		Year     int    `yaml:"year"`
+		Files    bool   `yaml:"files"`
+	} `yaml:"watch"`
+	Replacements       []files.Replacement          `yaml:"replacements"`
+	CourseReplacements map[string]files.Replacement `yaml:"course-replacements"`
+}
 
 // All returns all the commands.
 func All(globals *opts.Global) []*cobra.Command {

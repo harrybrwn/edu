@@ -76,7 +76,6 @@ func Execute() (err error) {
 func init() {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yml")
-
 	if runtime.GOOS != "windows" {
 		viper.AddConfigPath("$XDG_CONFIG_HOME/edu")
 	}

@@ -13,8 +13,10 @@ import (
 	"github.com/harrybrwn/edu/cmd/internal"
 	"github.com/harrybrwn/edu/cmd/internal/files"
 	"github.com/harrybrwn/edu/cmd/internal/opts"
+	"github.com/harrybrwn/edu/cmd/internal/watch"
 	"github.com/harrybrwn/edu/pkg/term"
 	"github.com/harrybrwn/edu/school/ucmerced/ucm"
+	"github.com/harrybrwn/errs"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -61,10 +63,9 @@ registration information.`,
 			"  $ edu registration cse 100 --term=fall\n" +
 			"  $ edu reg --open --year=2021 --term=summer WRI 10",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			// if sflags.year == 0 {
-			// 	// return errs.New("no year given (" + viper.ConfigFileUsed())
-			// 	return fmt.Errorf("no year given (see %s)", viper.ConfigFileUsed())
-			// }
+			if sflags.year == 0 {
+				return errs.New("no year given")
+			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
@@ -146,16 +147,6 @@ func newCheckCRNCmd(sflags *scheduleFlags) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&subject, "subject", "", "check the CRNs for a specific subject")
 	return cmd
-}
-
-type watcher interface {
-	Watch() error
-}
-
-type watcherFunc func() error
-
-func (wf watcherFunc) Watch() error {
-	return wf()
 }
 
 type crnWatcher struct {
@@ -264,15 +255,13 @@ func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
 				verbose: verbose,
 			}
 
-			var watches = []watcher{crnWatch}
+			var watches = []watch.Watcher{crnWatch}
 			if viper.GetBool("watch.files") {
-				watches = append(watches, watcherFunc(watchFiles))
+				watches = append(watches, watch.WatcherFunc(watchFiles))
 			}
 			for {
-				log.Printf("scanning every %d\n", duration)
-
 				for _, wt := range watches {
-					go func(wt watcher) {
+					go func(wt watch.Watcher) {
 						if err := wt.Watch(); err != nil {
 							log.Printf("Watch Error: %s\n", err.Error())
 						}
@@ -300,12 +289,6 @@ func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
 	return c
 }
 
-func runwatch(wt watcher) {
-	if err := wt.Watch(); err != nil {
-		log.Printf("Watch Error: %s", err.Error())
-	}
-}
-
 func checkCRNList(crns []int, subject string, sflags *scheduleFlags) error {
 	schedule, err := ucm.BySubject(sflags.year, sflags.term, subject, true)
 	if err != nil {
@@ -326,7 +309,6 @@ func checkCRNList(crns []int, subject string, sflags *scheduleFlags) error {
 	for _, crn := range openCrns {
 		msg += fmt.Sprintf("%d\n", crn)
 	}
-
 	if viper.GetBool("notifications") {
 		return beeep.Notify("Found Open Courses", msg, "")
 	}

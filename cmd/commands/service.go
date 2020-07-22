@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -37,17 +38,26 @@ WantedBy=multi-user.target
 func genServiceCmd() *cobra.Command {
 	var (
 		filename string = "./edu.service"
-		restart  bool
-		install  bool
+
+		restart, stop, start, install bool
 	)
 	c := &cobra.Command{
 		Use:    "service",
-		Short:  "generate a systemd service",
-		Hidden: true,
+		Short:  "Generate and install a systemd service that runs 'edu' registration watch",
+		Hidden: false,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			if restart {
 				fmt.Println("restarting service")
 				return systemSudo("systemctl", "restart", "edu")
+			}
+			if stop {
+				return systemSudo("systemctl", "stop", "edu")
+			}
+			if start {
+				return systemSudo("systemctl", "start", "edu")
+			}
+			if len(args) == 1 {
+				filename = args[0]
 			}
 
 			data := struct {
@@ -66,31 +76,35 @@ func genServiceCmd() *cobra.Command {
 				return err
 			}
 
-			file, err := os.Create(filename)
-			if err != nil {
-				return fmt.Errorf("could not create %s: %w", filename, err)
+			var file io.Writer
+			if filename == "--" {
+				file = os.Stdout
+			} else {
+				file, err := os.Create(filename)
+				if err != nil {
+					return fmt.Errorf("could not create %s: %w", filename, err)
+				}
+				defer file.Close()
 			}
-			defer file.Close()
 			if err = tmpl.Execute(file, &data); err != nil {
 				return err
 			}
 			if !install {
 				return nil
 			}
-			return createService(filename)
+			return installService(filename)
 		},
 	}
 	flags := c.Flags()
 	flags.BoolVarP(&restart, "restart", "r", restart, "Restart the systemd service")
+	flags.BoolVar(&stop, "stop", stop, "Stop the systemd service")
+	flags.BoolVar(&start, "start", start, "Start the systemd service")
 	flags.BoolVarP(&install, "install", "i", install, "Install a systemd service.")
 	flags.StringVarP(&filename, "file", "f", filename, "Write the service to a file")
 	return c
 }
 
-func createService(filename string) (err error) {
-	// if os.Getenv("SUDO_COMMAND") == "" {
-	// 	return errors.New("please re-run this command as root (it needs to run 'sudo systemctl')")
-	// }
+func installService(filename string) (err error) {
 	_, name := filepath.Split(filename)
 	serviceName := strings.Replace(name, ".service", "", 1)
 	systemdfile := filepath.Join("/etc/systemd/system", name)
@@ -137,7 +151,7 @@ var sudoMsgOnce = sync.Once{}
 
 func sudoCommand(args ...string) *exec.Cmd {
 	sudoMsgOnce.Do(func() {
-		fmt.Print("running some commands with sudo...\n\n")
+		fmt.Print("Running some commands with sudo...\n\n")
 	})
 	fmt.Printf("sudo %s\n", strings.Join(args, " "))
 	return exec.Command("sudo", args...)
