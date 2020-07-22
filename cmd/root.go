@@ -33,7 +33,7 @@ var Logger = &lumberjack.Logger{
 
 // Stop will print to stderr and exit with status 1
 func Stop(message interface{}) {
-	log.Printf("%v", message)
+	log.Printf("%v\n", message)
 	fmt.Fprintf(os.Stderr, "%v\n", message)
 	switch msg := message.(type) {
 	case *internal.Error:

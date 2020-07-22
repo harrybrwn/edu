@@ -2,10 +2,9 @@ edu
 /vendor
 /dist
 /misc
+/scripts
 
 *.txt
 *.json
 *.service
-
-/scripts
 /upload.sh

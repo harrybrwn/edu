@@ -15,7 +15,6 @@ import (
 	"github.com/harrybrwn/edu/cmd/internal/opts"
 	"github.com/harrybrwn/edu/pkg/term"
 	"github.com/harrybrwn/edu/school/ucmerced/ucm"
-	"github.com/harrybrwn/errs"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -58,12 +57,14 @@ func newRegistrationCmd(globals *opts.Global) *cobra.Command {
 		Long: `Use the 'registration' command to get information on class
 registration information.`,
 		Aliases: []string{"reg", "register"},
-		Example: "  $ edu registration cse 100 --term=fall\n" +
+		Example: "" +
+			"  $ edu registration cse 100 --term=fall\n" +
 			"  $ edu reg --open --year=2021 --term=summer WRI 10",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if sflags.year == 0 {
-				return errs.New("no year given")
-			}
+			// if sflags.year == 0 {
+			// 	// return errs.New("no year given (" + viper.ConfigFileUsed())
+			// 	return fmt.Errorf("no year given (see %s)", viper.ConfigFileUsed())
+			// }
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
@@ -161,13 +162,32 @@ type crnWatcher struct {
 	crns    []int
 	names   []string
 	subject string
-	flags   *scheduleFlags
+	flags   scheduleFlags
 	verbose bool
 }
 
 func (cw *crnWatcher) Watch() error {
-	viper.ReadInConfig()
-	err := checkCRNList(cw.crns, cw.subject, cw.flags)
+	var (
+		subject = cw.subject
+		crns    = cw.crns
+	)
+	if viper.GetInt("watch.year") != 0 {
+		cw.flags.year = viper.GetInt("watch.year")
+	}
+	if viper.GetString("watch.term") != "" {
+		cw.flags.term = viper.GetString("watch.term")
+	}
+	if viper.GetString("watch.subject") != "" {
+		subject = viper.GetString("watch.subject")
+	}
+	configCrns := viper.GetIntSlice("watch.crns")
+	if len(configCrns) > 0 {
+		crns = append(crns, configCrns...)
+	}
+	if len(crns) < 1 {
+		return errors.New("no crns to check (see 'edu config' watch settings)")
+	}
+	err := checkCRNList(crns, subject, &cw.flags)
 	if err != nil {
 		if cw.verbose {
 			fmt.Println(err)
@@ -179,6 +199,9 @@ func (cw *crnWatcher) Watch() error {
 
 func watchFiles() error {
 	basedir := viper.GetString("basedir")
+	if basedir == "" {
+		return errors.New("cannot download files to an empty base directory")
+	}
 	courses, err := internal.GetCourses(false)
 	if err != nil {
 		return internal.HandleAuthErr(err)
@@ -224,37 +247,51 @@ func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
 		Long: "Watch for availability changes in a list of CRNs." +
 			"",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			crns, err := stroiArr(args)
+			basecrns, err := stroiArr(args)
 			if err != nil {
 				return err
 			}
-			crns = append(crns, viper.GetIntSlice("watch.crns")...)
-			if len(crns) < 1 {
-				return errors.New("no crns to check (see 'edu config' watch settings)")
-			}
-
 			var duration time.Duration
 			duration, err = time.ParseDuration(viper.GetString("watch.duration"))
 			if err != nil {
 				return err
 			}
 
-			var watches = []watcher{
-				&crnWatcher{
-					crns:    crns,
-					subject: subject,
-					flags:   sflags,
-					verbose: verbose,
-				},
+			crnWatch := &crnWatcher{
+				crns:    basecrns,
+				subject: subject,
+				flags:   *sflags,
+				verbose: verbose,
 			}
+
+			var watches = []watcher{crnWatch}
 			if viper.GetBool("watch.files") {
 				watches = append(watches, watcherFunc(watchFiles))
 			}
 			for {
+				log.Printf("scanning every %d\n", duration)
+
 				for _, wt := range watches {
-					go runwatch(wt)
+					go func(wt watcher) {
+						if err := wt.Watch(); err != nil {
+							log.Printf("Watch Error: %s\n", err.Error())
+						}
+					}(wt)
 				}
 				time.Sleep(duration)
+
+				// refresh variables from config
+				if err = viper.ReadInConfig(); err != nil {
+					log.Printf("could not refresh config during 'watch': %v", err)
+				}
+				if viper.GetString("watch.duration") != "" {
+					newdur, err := time.ParseDuration(viper.GetString("watch.duration"))
+					if err != nil {
+						log.Printf("could not refresh duration: %v", err)
+					} else if newdur != 0 {
+						duration = newdur
+					}
+				}
 			}
 		},
 	}
