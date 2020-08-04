@@ -73,9 +73,14 @@ func canvasCommands(flags *opts.Global) []*cobra.Command {
 
 var (
 	canvasCmd = &cobra.Command{
-		Use:     "canvas",
-		Aliases: []string{"canv", "ca"},
-		Short:   "A small collection of helper commands for canvas",
+		Use:        "canvas [no]",
+		Hidden:     true,
+		Deprecated: "all commands moved to the main command line interface",
+		Aliases:    []string{"canv", "ca"},
+		Short:      "A small collection of helper commands for canvas",
+		PersistentPreRun: func(*cobra.Command, []string) {
+			fmt.Println(term.Colorf("%r: 'canvas' command is deprecated. Commands moved to main cli.", "Warning"))
+		},
 	}
 )
 
@@ -287,7 +292,7 @@ func newUploadCmd() *cobra.Command {
 	)
 	c := &cobra.Command{
 		Use:   "upload",
-		Short: "Upload a file to canvas user account.",
+		Short: "Upload a file to your canvas user account.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 && file == "" {
 				file = args[0]

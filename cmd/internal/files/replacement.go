@@ -1,6 +1,7 @@
 package files
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -10,6 +11,10 @@ type Replacement struct {
 	Pattern     string `yaml:"pattern"`
 	Replacement string `yaml:"replacement"`
 	Lower       bool   `yaml:"lower"`
+}
+
+func (r Replacement) String() string {
+	return fmt.Sprintf("'%s' => '%s'", r.Pattern, r.Replacement)
 }
 
 // Replace will perform a replacement

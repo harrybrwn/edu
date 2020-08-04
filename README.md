@@ -15,6 +15,10 @@ brew install harrybrwn/tap/edu
 curl -LO https://github.com/harrybrwn/edu/releases/download/v0.0.3/edu_0.0.3_Linux_64-bit.deb
 sudo dpkg -i edu_0.0.3_Linux_64-bit.deb
 ```
+or with snapcraft
+```
+snap install go-edu
+```
 #### Rpm
 ```
 curl -LO https://github.com/harrybrwn/edu/releases/download/v0.0.3/edu_0.0.3_Linux_64-bit.rpm

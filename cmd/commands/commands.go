@@ -1,15 +1,22 @@
 package commands
 
 import (
+	"errors"
+	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"runtime"
+	"sort"
+	"strconv"
+	"time"
 
 	"github.com/harrybrwn/edu/cmd/internal"
 	"github.com/harrybrwn/edu/cmd/internal/config"
 	"github.com/harrybrwn/edu/cmd/internal/files"
 	"github.com/harrybrwn/edu/cmd/internal/opts"
+	"github.com/harrybrwn/edu/pkg/term"
 	"github.com/harrybrwn/errs"
 	"github.com/harrybrwn/go-canvas"
 	"github.com/spf13/cobra"
@@ -52,10 +59,19 @@ func All(globals *opts.Global) []*cobra.Command {
 	canvasCmd.AddCommand(
 		canvasCommands(globals)...,
 	)
+	canvasCmd.PersistentPostRun = canvasCmd.PersistentPreRun
 	all := []*cobra.Command{
-		newCoursesCmd(globals),
 		newConfigCmd(),
+
+		newCourseCmd(globals),
+		newUserCmd(),
+
 		canvasCmd,
+		newDueCmd(globals), // also in the canvas command
+		newFilesCmd(),
+		assignmentsCmd(),
+		newUploadCmd(),
+
 		newUpdateCmd(),
 		newRegistrationCmd(globals),
 		newTextCmd(),
@@ -71,28 +87,142 @@ func newCoursesCmd(opts *opts.Global) *cobra.Command {
 	c := &cobra.Command{
 		Use:     "courses",
 		Short:   "Show info on courses",
-		Aliases: []string{"course", "crs"},
+		Aliases: []string{"crs"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var (
-				err     error
-				courses []*canvas.Course
-			)
-			courses, err = internal.GetCourses(all)
-			if err != nil {
-				return internal.HandleAuthErr(err)
-			}
-			tab := internal.NewTable(cmd.OutOrStderr())
-			header := []string{"id", "name", "uuid", "code", "ends"}
-			internal.SetTableHeader(tab, header, !opts.NoColor)
-			for _, c := range courses {
-				tab.Append([]string{fmt.Sprintf("%d", c.ID), c.Name, c.UUID, c.CourseCode, c.EndAt.Format("01/02/06")})
-			}
-			tab.Render()
-			return nil
+			return printCourses(cmd.OutOrStdout(), opts, all)
 		},
 	}
 	flags := c.Flags()
 	flags.BoolVarP(&all, "all", "a", all, "show all courses (defaults to only active courses)")
+	return c
+}
+
+func printCourses(out io.Writer, opts *opts.Global, all bool) error {
+	var (
+		err     error
+		courses []*canvas.Course
+	)
+	courses, err = internal.GetCourses(all)
+	if err != nil {
+		return internal.HandleAuthErr(err)
+	}
+	tab := internal.NewTable(out)
+	header := []string{"id", "name", "uuid", "code", "ends"}
+	internal.SetTableHeader(tab, header, !opts.NoColor)
+	for _, c := range courses {
+		tab.Append([]string{fmt.Sprintf("%d", c.ID), c.Name, c.UUID, c.CourseCode, c.EndAt.Format("01/02/06")})
+	}
+	tab.Render()
+	return nil
+}
+
+func newCourseCmd(globals *opts.Global) *cobra.Command {
+	var all, users, ass bool
+	c := &cobra.Command{
+		Use:     "course [course id] [arguments]",
+		Short:   "Get more detailed information for a canvas course or canvas courses.",
+		Aliases: []string{"crs"},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// if there are not arguments just print out all the courses
+			if len(args) < 1 {
+				return printCourses(cmd.OutOrStdout(), globals, all)
+			}
+
+			var course *canvas.Course
+			if id, err := strconv.Atoi(args[0]); err == nil {
+				course, err = canvas.GetCourse(id)
+				if err != nil {
+					return err
+				}
+			} else {
+				courses, err := internal.GetCourses(all)
+				if err != nil {
+					return err
+				}
+				courseID := args[0]
+				for _, c := range courses {
+					if c.Name == courseID {
+						course = c
+						goto FoundCourse
+					}
+					if c.UUID == courseID {
+						course = c
+						goto FoundCourse
+					}
+				}
+				return errors.New("could not find course")
+			FoundCourse:
+			}
+
+			cmd.Printf("%d %s\n", course.ID, term.Colorf("%m", course.Name))
+
+			tab := internal.NewTable(cmd.OutOrStdout())
+			if users {
+				internal.SetTableHeader(tab, []string{"id", "name"}, !globals.NoColor)
+				userlist, err := course.Users()
+				if err != nil {
+					return err
+				}
+				for _, u := range userlist {
+					tab.Append([]string{strconv.Itoa(u.ID), u.Name})
+				}
+				tab.Render()
+				return nil
+			}
+			if ass {
+				internal.SetTableHeader(tab, []string{"id", "name", "due date"}, !globals.NoColor)
+				var dates dueDates
+				for as := range course.Assignments() {
+					dueAt := as.DueAt.Local()
+					dates = append(dates, dueDate{
+						id:   strconv.Itoa(as.ID),
+						name: as.Name,
+						date: dueAt,
+					})
+				}
+				sort.Sort(dates)
+				for _, d := range dates {
+					tab.Append([]string{d.id, d.name, d.date.Format(time.RFC822)})
+				}
+				tab.Render()
+				return nil
+			}
+			return nil
+		},
+	}
+	flags := c.Flags()
+	flags.BoolVarP(&users, "users", "u", users, "Print out a list of users")
+	flags.BoolVarP(&ass, "assignments", "a", ass, "Print out a list of assignments")
+	flag.BoolVar(&all, "all", all, "Look at all the courses in your canvas history")
+	return c
+}
+
+func newUserCmd() *cobra.Command {
+	c := &cobra.Command{
+		Use:    "user",
+		Short:  "",
+		Hidden: true,
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
+			var user *canvas.User
+			opts := []canvas.Option{
+				canvas.IncludeOpt("enrollments"),
+			}
+
+			if len(args) == 0 {
+				user, err = canvas.CurrentUser(opts...)
+			} else if id, err := strconv.Atoi(args[0]); err == nil {
+				user, err = canvas.GetUser(id, opts...)
+			} else {
+				user, err = canvas.CurrentUser(opts...)
+			}
+			if err != nil {
+				return err
+			}
+
+			fmt.Println(user.Name, user.Enrollments)
+			return nil
+		},
+	}
 	return c
 }
 

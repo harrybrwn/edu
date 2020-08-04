@@ -55,11 +55,32 @@ func Execute() (err error) {
 	if configfile != "" {
 		Logger.Filename = filepath.Join(filepath.Dir(configfile), "logs", "edu.log")
 	}
+
+	root := &cobra.Command{
+		Use:           "edu <command>",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		Version:       version,
+		Short:         "Command line tool for managing online school with canvas.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cmd.Help()
+		},
+		PersistentPreRun: func(*cobra.Command, []string) {
+			rootPreRun()
+		},
+	}
+
 	globalFlags := opts.Global{}
 	globalFlags.AddToFlagSet(root.PersistentFlags())
 
-	root.AddCommand(commands.All(&globalFlags)...)
-	root.AddCommand(completionCmd, testCmd)
+	root.SetUsageTemplate(commandTemplate)
+	root.AddCommand(append(
+		commands.All(&globalFlags),
+		completionCmd,
+		testCmd,
+
+		canvasHelp,
+	)...)
 	err = root.Execute()
 	if err != nil {
 		return errors.WithMessage(err, "Error")
@@ -75,35 +96,35 @@ func init() {
 		config.AddPath("$XDG_CONFIG_HOME/edu")
 	}
 	home := internal.Homedir()
-	config.AddPath(filepath.Join(home, "./.config/edu"))
-	config.AddPath(filepath.Join(home, "./.edu"))
+	config.AddPath(filepath.Join(home, ".config/edu"))
+	config.AddPath(filepath.Join(home, ".edu"))
 
 	beeep.DefaultDuration = 800
 }
 
-var (
-	root = &cobra.Command{
-		Use:           "edu",
-		SilenceErrors: true,
-		SilenceUsage:  true,
-		Version:       version,
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			host := config.GetString("host")
-			if host != "" {
-				canvas.DefaultHost = host
-			}
-			token := config.GetString("token")
-			if token == "" {
-				log.Println("no canvas api token")
-			}
-			canvas.SetToken(token)
-			canvas.ConcurrentErrorHandler = errorHandler
-		},
+func rootPreRun() {
+	host := config.GetString("host")
+	if host != "" {
+		canvas.DefaultHost = host
 	}
+	token := config.GetString("token")
+	if token == "" {
+		log.Println("no canvas api token")
+	}
+	canvas.SetToken(token)
+	canvas.ConcurrentErrorHandler = errorHandler
+}
 
+var (
 	completionCmd = &cobra.Command{
 		Use:   "completion",
 		Short: "Print a completion script to stdout.",
+		Long: `Use the completion command to generate a script for shell
+completion. Note: for zsh you will need to use the command
+'compdef _edu edu' after you source the generated script.`,
+		Example:   "$ source <(edu completion zsh)",
+		ValidArgs: []string{"zsh", "bash", "ps", "powershell", "fish"},
+		Aliases:   []string{"comp"},
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			root := cmd.Root()
 			out := cmd.OutOrStdout()
@@ -122,8 +143,6 @@ var (
 			}
 			return errs.New("unknown shell type")
 		},
-		ValidArgs: []string{"zsh", "bash", "ps", "powershell", "fish"},
-		Aliases:   []string{"comp"},
 	}
 
 	testCmd = &cobra.Command{
@@ -135,6 +154,20 @@ var (
 			}
 			return beeep.Notify("edu", args[0], "")
 		},
+	}
+
+	canvasHelp = &cobra.Command{
+		Use:   "canvas",
+		Short: "interfacing with the Canvas api",
+		Long: `
+In order to interface with the Canvas API, you need to first
+obtain a token from you account. You can find a tutorial for
+obtaining a token from this url:
+
+    https://community.canvaslms.com/docs/DOC-16005-42121018197
+
+Once you have the token, either set the $CANVAS_TOKEN environment
+variable or set it in the config file (see 'edu help config').`,
 	}
 )
 
@@ -160,3 +193,31 @@ func errorHandler(e error) error {
 func errmsg(msg interface{}) {
 	fmt.Fprintf(os.Stderr, "Error: %v\n", msg)
 }
+
+var commandTemplate = `Usage:
+{{if .Runnable}}
+	{{.UseLine}}{{end}}{{if gt (len .Aliases) 0}}
+
+Aliases:
+	{{.NameAndAliases}}{{end}}{{if .HasExample}}
+
+Examples:
+	{{.Example}}{{end}}{{if .HasAvailableSubCommands}}
+
+Available Commands:
+{{range .Commands}}{{if (or .IsAvailableCommand (eq .Name "help"))}}
+	{{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
+
+Flags:
+
+{{.LocalFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasAvailableInheritedFlags}}
+
+Global Flags:
+{{.InheritedFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasHelpSubCommands}}
+
+Additional help topics:
+{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
+	{{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableSubCommands}}
+
+Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
+`

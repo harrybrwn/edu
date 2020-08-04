@@ -14,7 +14,12 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var defaultConfig *Config
+var (
+	// ErrNoConfigFile is returned when the config file cannot be found
+	ErrNoConfigFile = errors.New("no config file")
+
+	defaultConfig *Config
+)
 
 func init() {
 	defaultConfig = &Config{}
@@ -76,7 +81,10 @@ func ReadConfigFile() error {
 func (c *Config) ReadConfigFile() error {
 	filename := c.FileUsed()
 	if filename == "" {
-		return errors.New("no config file to read")
+		return ErrNoConfigFile
+	}
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		return ErrNoConfigFile
 	}
 	raw, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -95,9 +103,8 @@ func FileUsed() string {
 // configuration.
 func (c *Config) FileUsed() string {
 	for _, path := range c.paths {
-		configFile := filepath.Join(path, c.file)
-		if _, err := os.Stat(configFile); !os.IsNotExist(err) {
-			return configFile
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			return filepath.Join(path, c.file)
 		}
 	}
 	return ""
@@ -147,14 +154,15 @@ func GetString(key string) string {
 }
 
 // GetString will get the config value by name and
-// return it as a string
+// return it as a string. This function will also expand
+// any environment variables in the value returned.
 func (c *Config) GetString(key string) string {
 	keys := strings.Split(key, ".")
 	ok, _, val := findKey(reflect.ValueOf(c.config).Elem(), keys)
 	if !ok {
 		return ""
 	}
-	return val.String()
+	return os.ExpandEnv(val.String())
 }
 
 // GetInt will get the int value of a key
@@ -213,12 +221,13 @@ func findKey(val reflect.Value, keyPath []string) (bool, *reflect.StructField, r
 				return ok, structField, value
 			}
 			if isZero(value) {
-				deflt := typFld.Tag.Get("default")
+				// priority goes to env variables
 				env := typFld.Tag.Get("env")
-				if deflt != "" {
-					return true, &typFld, typedDefaultValue(&typFld, deflt)
-				} else if env != "" {
-					return true, &typFld, typedDefaultValue(&typFld, os.Getenv(env))
+				deflt := typFld.Tag.Get("default")
+				if env != "" {
+					value = typedDefaultValue(&typFld, os.Getenv(env))
+				} else if deflt != "" {
+					value = typedDefaultValue(&typFld, deflt)
 				}
 			}
 			return true, &typFld, value
