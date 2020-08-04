@@ -3,12 +3,14 @@ package commands
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/harrybrwn/edu/cmd/internal"
@@ -16,6 +18,7 @@ import (
 	"github.com/harrybrwn/edu/pkg/term"
 	"github.com/harrybrwn/go-canvas"
 	"github.com/jaytaylor/html2text"
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"golang.org/x/net/html"
@@ -106,11 +109,11 @@ func newDueCmd(flags *opts.Global) *cobra.Command {
 				return internal.HandleAuthErr(err)
 			}
 			if len(args) > 0 {
+				id, err := strconv.Atoi(args[0])
+				if err != nil {
+					return err
+				}
 				for _, course := range courses {
-					id, err := strconv.Atoi(args[0])
-					if err != nil {
-						return err
-					}
 					as, err := course.Assignment(id)
 					if err != nil {
 						continue
@@ -132,37 +135,68 @@ func newDueCmd(flags *opts.Global) *cobra.Command {
 				return nil
 			}
 
+			// if the user has not given a crn, then we print out all the assignments
+			var wg sync.WaitGroup
+			wg.Add(len(courses))
 			tab := internal.NewTable(cmd.OutOrStdout())
 			internal.SetTableHeader(tab, []string{"id", "name", "due"}, !flags.NoColor)
-			now := time.Now().Local()
-			for _, course := range courses {
-				var dates dueDates
-				for as := range course.Assignments() {
-					dueAt := as.DueAt.Local()
-					if !all && dueAt.Before(now) {
-						continue
-					}
-					dates = append(dates, dueDate{
-						id:   strconv.Itoa(as.ID),
-						name: as.Name,
-						date: dueAt,
-					})
-				}
-				sort.Sort(dates)
-				for _, d := range dates {
-					tab.Append([]string{d.id, d.name, d.date.Format(time.RFC822)})
-				}
-				cmd.Println(term.Colorf("  %m", course.Name))
-				tab.Render()
-				tab.ClearRows()
-				println()
+
+			printer := &assignmentPrinter{
+				w:   cmd.OutOrStdout(),
+				tab: tab,
+				wg:  &wg,
+				all: all,
+				now: time.Now(),
 			}
+			for _, course := range courses {
+				go printer.printCourse(course)
+			}
+			wg.Wait()
 			return nil
 		},
 	}
 	dueCmd.Flags().BoolVar(&nolinks, "no-links", false, "hide links from assignment description")
 	dueCmd.Flags().BoolVarP(&all, "all", "a", false, "show all the assignments")
 	return dueCmd
+}
+
+type assignmentPrinter struct {
+	w       io.Writer
+	tab     *tablewriter.Table
+	tableMu sync.Mutex
+	wg      *sync.WaitGroup
+	all     bool
+	now     time.Time
+}
+
+func (p *assignmentPrinter) printCourse(course *canvas.Course) {
+	var dates dueDates
+	for as := range course.Assignments() {
+		dueAt := as.DueAt.Local()
+		if !p.all && dueAt.Before(p.now) {
+			continue
+		}
+		dates = append(dates, dueDate{
+			id:   strconv.Itoa(as.ID),
+			name: as.Name,
+			date: dueAt,
+		})
+	}
+	sort.Sort(dates)
+
+	// rendering
+	p.tableMu.Lock()
+	fmt.Fprintln(p.w, term.Colorf("  %m", course.Name))
+	for _, d := range dates {
+		p.tab.Append([]string{d.id, d.name, d.date.Format(time.RFC822)})
+	}
+	p.tab.Render()
+	p.tab.ClearRows()
+	fmt.Fprintf(p.w, "\n")
+
+	// clean up
+	p.tableMu.Unlock()
+	p.wg.Done()
 }
 
 func newFilesCmd() *cobra.Command {
