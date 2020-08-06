@@ -53,6 +53,7 @@ func newRegistrationCmd(globals *opts.Global) *cobra.Command {
 		year:   config.GetInt("registration.year"),
 		Global: globals,
 	}
+
 	c := &cobra.Command{
 		Use:   "registration",
 		Short: "Get registration data",
@@ -60,8 +61,8 @@ func newRegistrationCmd(globals *opts.Global) *cobra.Command {
 registration information.`,
 		Aliases: []string{"reg", "register"},
 		Example: "" +
-			"  $ edu registration cse 100 --term=fall\n" +
-			"  $ edu reg --open --year=2021 --term=summer WRI 10",
+			"$ edu registration cse 100 --term=fall\n" +
+			"\t$ edu reg --open --year=2021 --term=summer WRI 10",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if sflags.year == 0 {
 				return errs.New("no year given")

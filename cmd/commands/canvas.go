@@ -67,13 +67,12 @@ func canvasCommands(flags *opts.Global) []*cobra.Command {
 		newFilesCmd(),
 		newDueCmd(flags),
 		newUploadCmd(),
-		assignmentsCmd(),
 	}
 }
 
 var (
 	canvasCmd = &cobra.Command{
-		Use:        "canvas [no]",
+		Use:        "canvas",
 		Hidden:     true,
 		Deprecated: "all commands moved to the main command line interface",
 		Aliases:    []string{"canv", "ca"},
@@ -103,10 +102,34 @@ func (dd dueDates) Less(i, j int) bool {
 	return dd[i].date.Before(dd[j].date)
 }
 
+func searchForAssignment(
+	course *canvas.Course,
+	key interface{},
+	all bool,
+) (*canvas.Assignment, error) {
+	switch v := key.(type) {
+	case int:
+		return course.Assignment(v, canvas.Opt("all_dates", all))
+	case string:
+		for as := range course.Assignments(
+			canvas.Opt("search_term", v),
+			canvas.Opt("order_by", "name"),
+			canvas.Opt("all_dates", all),
+		) {
+			if as.Name == v {
+				return as, nil
+			}
+		}
+		return nil, fmt.Errorf("could not find assignment '%s'", v)
+	default:
+		return nil, fmt.Errorf("don't know how to search with %T", v)
+	}
+}
+
 func newDueCmd(flags *opts.Global) *cobra.Command {
 	var nolinks, all bool
 	dueCmd := &cobra.Command{
-		Use:   "due",
+		Use:   "due [id|name]",
 		Short: "List all the due date on canvas.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			courses, err := internal.GetCourses(false)
@@ -115,11 +138,13 @@ func newDueCmd(flags *opts.Global) *cobra.Command {
 			}
 			if len(args) > 0 {
 				id, err := strconv.Atoi(args[0])
+				var key interface{} = id
 				if err != nil {
-					return err
+					key = args[0]
 				}
+
 				for _, course := range courses {
-					as, err := course.Assignment(id)
+					as, err := searchForAssignment(course, key, all)
 					if err != nil {
 						continue
 					}
@@ -133,8 +158,8 @@ func newDueCmd(flags *opts.Global) *cobra.Command {
 					if err != nil {
 						return err
 					}
-					fmt.Println(term.Colorf("%b %r", as.Name, as.DueAt.Local().String()))
-					fmt.Println(text)
+					cmd.Println(term.Colorf("%b %r", as.Name, as.DueAt.Local().String()))
+					cmd.Println(text)
 					return nil
 				}
 				return nil
@@ -144,6 +169,7 @@ func newDueCmd(flags *opts.Global) *cobra.Command {
 			var wg sync.WaitGroup
 			wg.Add(len(courses))
 			tab := internal.NewTable(cmd.OutOrStdout())
+			tab.SetAutoWrapText(false)
 			internal.SetTableHeader(tab, []string{"id", "name", "due"}, !flags.NoColor)
 
 			printer := &assignmentPrinter{
@@ -176,7 +202,7 @@ type assignmentPrinter struct {
 
 func (p *assignmentPrinter) printCourse(course *canvas.Course) {
 	var dates dueDates
-	for as := range course.Assignments() {
+	for as := range course.Assignments(canvas.Opt("order_by", "due_at")) {
 		dueAt := as.DueAt.Local()
 		if !p.all && dueAt.Before(p.now) {
 			continue
@@ -220,6 +246,7 @@ func newFilesCmd() *cobra.Command {
 			opts := []canvas.Option{canvas.SortOpt(sortby...)}
 			opts = append(opts, ff.options()...)
 			count := 0
+
 			for _, course := range courses {
 				if course.AccessRestrictedByDate {
 					fmt.Fprintf(
@@ -240,47 +267,6 @@ func newFilesCmd() *cobra.Command {
 	flags := c.Flags()
 	flags.StringArrayVarP(&sortby, "sortyby", "s", sortby, "how the files should be sorted")
 	ff.addToFlagSet(flags)
-	return c
-}
-
-func assignmentsCmd() *cobra.Command {
-	var nolinks bool
-	c := &cobra.Command{
-		Use:     "assignments",
-		Hidden:  true,
-		Aliases: []string{"as"},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			id, err := strconv.Atoi(args[0])
-			if err != nil {
-				return err
-			}
-			courses, err := internal.GetCourses(true)
-			if err != nil {
-				return internal.HandleAuthErr(err)
-			}
-			for _, course := range courses {
-				as, err := course.Assignment(id)
-				if err != nil {
-					continue
-				}
-				text, err := html2text.FromString(
-					as.Description,
-					html2text.Options{
-						PrettyTables: true,
-						OmitLinks:    nolinks,
-					},
-				)
-				if err != nil {
-					return err
-				}
-				fmt.Println(term.Colorf("%b %r", as.Name, as.DueAt.Local().String()))
-				fmt.Println(text)
-				return nil
-			}
-			return fmt.Errorf("did not find assignment %d", id)
-		},
-	}
-	c.Flags().BoolVar(&nolinks, "no-links", nolinks, "hide all links in the assignment description")
 	return c
 }
 

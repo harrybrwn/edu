@@ -12,6 +12,7 @@ import (
 	"text/template"
 
 	"github.com/harrybrwn/edu/cmd/internal/config"
+	"github.com/harrybrwn/errs"
 	"github.com/spf13/cobra"
 )
 
@@ -37,7 +38,8 @@ WantedBy=multi-user.target
 
 func genServiceCmd() *cobra.Command {
 	var (
-		filename string = "./edu.service"
+		filename     string = ""
+		templateFile string
 
 		restart, stop, start, install bool
 	)
@@ -46,62 +48,99 @@ func genServiceCmd() *cobra.Command {
 		Short:  "Generate and install a systemd service that runs 'edu' registration watch",
 		Hidden: false,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			if restart {
-				fmt.Println("restarting service")
-				return systemSudo("systemctl", "restart", "edu")
-			}
-			if stop {
-				return systemSudo("systemctl", "stop", "edu")
-			}
-			if start {
-				return systemSudo("systemctl", "start", "edu")
-			}
 			if len(args) == 1 {
 				filename = args[0]
 			}
-
-			data := struct {
-				User, Bin   string
-				CanvasToken string
-			}{
-				CanvasToken: os.ExpandEnv(config.GetString("token")),
-				User:        os.Getenv("USER"),
-			}
-			data.Bin, err = os.Executable()
-			if err != nil {
-				return err
-			}
-			tmpl, err := template.New("service").Parse(serviceTemplate)
-			if err != nil {
-				return err
+			if filename == "-" {
+				return execTemplate(os.Stdout, templateFile)
 			}
 
-			var file io.Writer
-			if filename == "--" {
-				file = os.Stdout
-			} else {
+			if filename != "" {
 				file, err := os.Create(filename)
 				if err != nil {
 					return fmt.Errorf("could not create %s: %w", filename, err)
 				}
 				defer file.Close()
+				defer os.Remove(filename)
+				return execTemplate(file, templateFile)
 			}
-			if err = tmpl.Execute(file, &data); err != nil {
+			return system("systemctl", "--no-pager", "--lines", "15", "-l", "status", "edu")
+		},
+	}
+
+	c.AddCommand(&cobra.Command{
+		Use: "install", Short: "Create a service and install it.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if filename == "" {
+				filename = filepath.Join(os.TempDir(), "edu.service")
+			}
+			file, err := os.Create(filename)
+			if err != nil {
 				return err
 			}
-			if !install {
-				return nil
+			defer file.Close()
+			defer os.Remove(filename)
+			if err = execTemplate(file, templateFile); err != nil {
+				return err
 			}
 			return installService(filename)
 		},
-	}
+	}, &cobra.Command{
+		Use: "delete", Short: "Delete the service",
+		RunE: func(*cobra.Command, []string) error {
+			return errs.Chain(
+				sudo("systemctl", "stop", "edu"),
+				sudo("rm", "/etc/systemd/system/edu.service"),
+				sudo("systemctl", "daemon-reload"))
+		},
+	}, &cobra.Command{
+		Use: "restart", Short: "Restart the service",
+		RunE: sudoCmd("systemctl", "restart", "edu"),
+	}, &cobra.Command{
+		Use: "stop", Short: "Stop the service",
+		RunE: sudoCmd("systemctl", "stop", "edu"),
+	}, &cobra.Command{
+		Use: "start", Short: "Start the service",
+		RunE: sudoCmd("systemctl", "start", "edu"),
+	})
+
+	pflags := c.PersistentFlags()
+	pflags.StringVarP(&filename, "file", "f", filename, "Write the service to a file")
+	pflags.StringVar(&templateFile, "template-file", "", "Read the systemd service template from a file")
 	flags := c.Flags()
 	flags.BoolVarP(&restart, "restart", "r", restart, "Restart the systemd service")
 	flags.BoolVar(&stop, "stop", stop, "Stop the systemd service")
 	flags.BoolVar(&start, "start", start, "Start the systemd service")
 	flags.BoolVarP(&install, "install", "i", install, "Install a systemd service.")
-	flags.StringVarP(&filename, "file", "f", filename, "Write the service to a file")
 	return c
+}
+
+func sudoCmd(args ...string) func(*cobra.Command, []string) error {
+	return func(*cobra.Command, []string) error {
+		return sudo(args...)
+	}
+}
+
+func execTemplate(w io.Writer, tmplFile string) (err error) {
+	data := struct {
+		User, Bin   string
+		CanvasToken string
+	}{
+		CanvasToken: os.ExpandEnv(config.GetString("token")),
+		User:        os.Getenv("USER"),
+	}
+	data.Bin, err = os.Executable()
+	if err != nil {
+		return err
+	}
+
+	var tmpl *template.Template
+	if tmplFile != "" {
+		tmpl, err = template.ParseFiles(tmplFile)
+	} else {
+		tmpl, err = template.New("service").Parse(serviceTemplate)
+	}
+	return tmpl.Execute(w, &data)
 }
 
 func installService(filename string) (err error) {
@@ -113,30 +152,30 @@ func installService(filename string) (err error) {
 	// if the service exists then we are going to stop it
 	if err = statusCmd.Run(); err == nil {
 		log.Printf("stoping/disabling current service '%s' (%s)\n", name, systemdfile)
-		if err = systemSudo("systemctl", "stop", serviceName); err != nil {
+		if err = sudo("systemctl", "stop", serviceName); err != nil {
 			return fmt.Errorf("could not stop existing service %s: %w", serviceName, err)
 		}
-		if err = systemSudo("systemctl", "disable", serviceName); err != nil {
+		if err = sudo("systemctl", "disable", serviceName); err != nil {
 			return fmt.Errorf("could not disable existing service %s: %w", serviceName, err)
 		}
-		if err = systemSudo("rm", systemdfile); err != nil {
+		if err = sudo("rm", systemdfile); err != nil {
 			log.Printf("could not remove existing service %s: %v\n", systemdfile, err)
 		}
 	}
 
-	err = systemSudo("install", "-m", "644", filename, systemdfile)
+	err = sudo("install", "-m", "644", filename, systemdfile)
 	if err != nil {
 		return fmt.Errorf("could not copy service file: %w", err)
 	}
-	err = systemSudo("systemctl", "enable", "edu")
+	err = sudo("systemctl", "enable", "edu")
 	if err != nil {
 		return fmt.Errorf("could not enable service: %w", err)
 	}
-	err = systemSudo("systemctl", "start", "edu")
+	err = sudo("systemctl", "start", "edu")
 	if err != nil {
 		return fmt.Errorf("could not start service: %w", err)
 	}
-	return os.Remove(filename)
+	return nil
 }
 
 func system(command string, args ...string) error {
@@ -157,7 +196,7 @@ func sudoCommand(args ...string) *exec.Cmd {
 	return exec.Command("sudo", args...)
 }
 
-func systemSudo(args ...string) error {
+func sudo(args ...string) error {
 	cmd := sudoCommand(args...)
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout

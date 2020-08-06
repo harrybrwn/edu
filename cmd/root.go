@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/gen2brain/beeep"
 	"github.com/harrybrwn/edu/cmd/commands"
@@ -26,7 +25,7 @@ var Logger = &lumberjack.Logger{
 	Filename:   filepath.Join(os.TempDir(), "edu.log"),
 	MaxSize:    25,  // megabytes
 	MaxBackups: 10,  // number of spare files
-	MaxAge:     365, //days
+	MaxAge:     365, // days
 	Compress:   false,
 }
 
@@ -45,9 +44,15 @@ func Stop(message interface{}) {
 // Execute will execute the root comand on the cli
 func Execute() (err error) {
 	log.SetOutput(Logger)
-	config.SetStruct(commands.Conf)
+
+	config.SetFilename("config.yml")
+	config.SetType("yaml")
+	config.AddPath("$EDU_CONFIG")
+	config.AddDefaultDirs("edu")
+	config.SetConfig(commands.Conf)
+
 	err = config.ReadConfigFile()
-	if err != nil {
+	if err != config.ErrNoConfigFile && err != nil {
 		return err
 	}
 
@@ -56,12 +61,14 @@ func Execute() (err error) {
 		Logger.Filename = filepath.Join(filepath.Dir(configfile), "logs", "edu.log")
 	}
 
+	beeep.DefaultDuration = 800
 	root := &cobra.Command{
 		Use:           "edu <command>",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		Version:       version,
 		Short:         "Command line tool for managing online school with canvas.",
+		Long:          ``,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cmd.Help()
 		},
@@ -78,7 +85,6 @@ func Execute() (err error) {
 		commands.All(&globalFlags),
 		completionCmd,
 		testCmd,
-
 		canvasHelp,
 	)...)
 	err = root.Execute()
@@ -86,20 +92,6 @@ func Execute() (err error) {
 		return errors.WithMessage(err, "Error")
 	}
 	return err
-}
-
-func init() {
-	config.SetFilename("config.yml")
-	config.SetType("yaml")
-
-	if runtime.GOOS != "windows" {
-		config.AddPath("$XDG_CONFIG_HOME/edu")
-	}
-	home := internal.Homedir()
-	config.AddPath(filepath.Join(home, ".config/edu"))
-	config.AddPath(filepath.Join(home, ".edu"))
-
-	beeep.DefaultDuration = 800
 }
 
 func rootPreRun() {
