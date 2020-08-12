@@ -14,8 +14,12 @@ import (
 	"time"
 )
 
-func cleanup() {
-	c = &Config{}
+var pi string
+
+func init()    { pi = strconv.FormatFloat(math.Pi, 'f', 15, 64) }
+func cleanup() { c = &Config{} }
+
+func Test(t *testing.T) {
 }
 
 func TestPaths(t *testing.T) {
@@ -124,9 +128,10 @@ func TestReadConfig_Err(t *testing.T) {
 	dir := filepath.Join(
 		os.TempDir(), fmt.Sprintf("config_test.%s_%d_%d",
 			t.Name(), os.Getpid(), time.Now().UnixNano()))
+	AddPath("/tmp/some/path")
 	AddPath(dir)
-	if dirused := DirUsed(); dirused != "" {
-		t.Error("expected empty dir because config paths do not exist")
+	if dirused := DirUsed(); dirused != "/tmp/some/path" {
+		t.Error("DirUsed should be the first non-empty path if none exist")
 	}
 	if err = ReadConfigFile(); err != ErrNoConfigDir {
 		t.Error("should return the 'no config dir' error")
@@ -137,6 +142,8 @@ func TestReadConfig_Err(t *testing.T) {
 
 	if dirused := DirUsed(); dirused != dir {
 		t.Errorf("wrong DirUsed: got %s; want %s", dirused, dir)
+	} else if dirused == "/tmp/some/path" {
+		t.Error("the dummy path should not exist!")
 	}
 	SetFilename("config")
 	check(SetType("yml"))
@@ -300,6 +307,68 @@ func TestDefaults(t *testing.T) {
 	}
 }
 
+func TestSetDefaults(t *testing.T) {
+	defer cleanup()
+	type C struct {
+		A         string `config:"a" env:"TEST_A"`
+		B         uint   `config:"b" default:"3"`
+		NoDefault int8
+		TF        bool    `config:"truefalse" default:"true"`
+		F         float64 `config:"f" env:"PI"`
+		Bytes     []byte  `default:"byte string"`
+		Inner     struct {
+			Inner struct {
+				Inner struct {
+					Inner struct {
+						Val   string `default:"wow such nesting"`
+						Other int    `default:"69"` // shut up, i do what i want
+						Thing int16  `default:"99"`
+					} `config:"inner"`
+				} `config:"inner"`
+			} `config:"inner"`
+		} `config:"inner"`
+	}
+	os.Setenv("TEST_A", "testing-auto-defaults")
+	os.Setenv("PI", pi)
+	conf := &C{}
+	SetConfig(conf)
+	conf.Inner.Inner.Inner.Inner.Other = 7
+	conf.B = 100
+	v := reflect.ValueOf(conf).Elem()
+	err := setDefaults(v)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if conf.A != "testing-auto-defaults" {
+		t.Error("string env default was not set")
+	}
+	if conf.F != math.Pi {
+		t.Error("float env default was not set")
+	}
+	if conf.TF != true {
+		t.Error("bool default was not set")
+	}
+	if conf.Inner.Inner.Inner.Inner.Thing != 99 {
+		t.Error("int16 default was not set")
+	}
+	if conf.Inner.Inner.Inner.Inner.Val != "wow such nesting" {
+		t.Error("string default was not set")
+	}
+	if conf.B == 3 {
+		t.Error("should only set defaults for fields with a zero value")
+	}
+	if conf.Inner.Inner.Inner.Inner.Other == 69 {
+		t.Error("should only set defaults for fields with a zero value")
+	}
+	if conf.Inner.Inner.Inner.Inner.Other != 7 {
+		t.Error("wrong value")
+	}
+	if GetInt("inner.inner.inner.inner.Other") != 7 {
+		t.Error("wrong value")
+	}
+}
+
 func TestDefaults_Err(t *testing.T) {
 	defer cleanup()
 	type C struct {
@@ -418,5 +487,38 @@ func TestSet(t *testing.T) {
 	}
 	if conf.C != 99.99i {
 		t.Error("did not set the correct value")
+	}
+}
+
+func TestIsEmpty(t *testing.T) {
+	defer cleanup()
+	type C struct {
+		M      map[string]string `config:"map"`
+		Notmap int               `config:"not-map"`
+		S      string            `config:"s"`
+		I      int               `config:"i"`
+	}
+	conf := &C{}
+	SetConfig(conf)
+	if !IsEmpty("s") {
+		t.Error("should be empty")
+	}
+	if !IsEmpty("i") {
+		t.Error("should be empty")
+	}
+	if !IsEmpty("map") {
+		t.Error("should be empty")
+	}
+	conf.I = 1
+	conf.S = "hello"
+	conf.M = map[string]string{"a": "b"}
+	if IsEmpty("s") {
+		t.Error("should not be empty")
+	}
+	if IsEmpty("i") {
+		t.Error("should not be empty")
+	}
+	if IsEmpty("map") {
+		t.Error("should not be empty")
 	}
 }

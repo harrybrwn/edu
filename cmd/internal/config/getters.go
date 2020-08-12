@@ -19,6 +19,25 @@ func (c *Config) HasKey(key string) bool {
 	return hasKey(c.elem, strings.Split(key, "."))
 }
 
+// IsEmpty returns true if the value stored at some
+// key is a zero value or an empty value
+func IsEmpty(key string) bool {
+	return c.IsEmpty(key)
+}
+
+// IsEmpty returns true if the value stored at some
+// key is a zero value or an empty value
+func (c *Config) IsEmpty(key string) bool {
+	val, err := c.get(key)
+	if err != nil {
+		return true
+	}
+	if !val.IsValid() {
+		return false
+	}
+	return val.IsZero()
+}
+
 // Get will get a variable by key
 func Get(key string) interface{} { return c.Get(key) }
 
@@ -50,7 +69,7 @@ func (c *Config) get(key string) (reflect.Value, error) {
 		panic(errElemNotSet)
 	}
 	keys := strings.Split(key, ".")
-	_, _, val, err := find(c.elem, keys)
+	val, err := find(c.elem, keys)
 	return val, err
 }
 
@@ -172,7 +191,11 @@ func (c *Config) GetIntSlice(key string) []int {
 	if val.Kind() != reflect.Slice {
 		return nil
 	}
-	return val.Interface().([]int)
+	ret, ok := val.Interface().([]int)
+	if !ok {
+		return nil
+	}
+	return ret
 }
 
 // GetInt64Slice will return a slice of int64.
@@ -193,7 +216,11 @@ func (c *Config) GetInt64Slice(key string) []int64 {
 	if res.Kind() != reflect.Slice {
 		return nil
 	}
-	return res.Interface().([]int64)
+	ret, ok := res.Interface().([]int64)
+	if !ok {
+		return nil
+	}
+	return ret
 }
 
 // GetStringMap will get a map of string keys to string values
@@ -218,34 +245,38 @@ func (c *Config) GetStringMap(key string) map[string]string {
 	return m
 }
 
-func find(val reflect.Value, keyPath []string) (bool, *reflect.StructField, reflect.Value, error) {
+func find(val reflect.Value, keyPath []string) (reflect.Value, error) {
+	var err error
 	typ := val.Type()
 	n := typ.NumField()
 	for i := 0; i < n; i++ {
 		typFld := typ.Field(i)
+		// if the first key is the same as the fieldname
 		if isCorrectLabel(keyPath[0], typFld) {
 			value := val.Field(i)
 			if len(keyPath) > 1 {
 				return find(value, keyPath[1:])
 			}
-			if isZero(value) {
-				// priority goes to env variables
-				env := typFld.Tag.Get("env")
-				deflt := typFld.Tag.Get("default")
-				var err error
-				if env != "" {
-					value, err = typedDefaultValue(&typFld, os.Getenv(env))
-				} else if deflt != "" {
-					value, err = typedDefaultValue(&typFld, deflt)
-				}
-				if err != nil {
-					return false, &typFld, nilval, err
-				}
+			if !isZero(value) {
+				// if the field has been set then we return it
+				return value, nil
 			}
-			return true, &typFld, value, nil
+
+			defvalue, err := getDefaultValue(&typFld, &value)
+			switch err {
+			case errNoDefaultValue:
+				return value, nil
+			case nil:
+				return defvalue, nil
+			default: // err != nil
+				return defvalue, err
+			}
 		}
 	}
-	return false, nil, nilval, ErrFieldNotFound
+	if err == nil {
+		err = ErrFieldNotFound
+	}
+	return nilval, err
 }
 
 func hasKey(val reflect.Value, keyPath []string) bool {
@@ -263,6 +294,125 @@ func hasKey(val reflect.Value, keyPath []string) bool {
 	return false
 }
 
+func setDefaults(val reflect.Value) (err error) {
+	var seterr error
+	typ := val.Type()
+	n := typ.NumField()
+	for i := 0; i < n; i++ {
+		fldVal := val.Field(i)  // field's value
+		fldType := typ.Field(i) // field's type
+		// make recursive calls
+		if fldVal.Kind() == reflect.Struct {
+			return setDefaults(fldVal)
+		}
+		// if the field has been set already, then
+		// it is a significant value to the user
+		// do not override with defaults
+		if !isZero(fldVal) {
+			continue
+		}
+
+		defval, err := getDefaultValue(&fldType, &fldVal)
+		switch err {
+		case errNoDefaultValue:
+			continue
+		case nil:
+			break
+		default:
+			return err
+		}
+		if fldVal.CanSet() {
+			fldVal.Set(defval)
+		} else {
+			if seterr == nil {
+				seterr = fmt.Errorf("cannot set value for field '%s'", fldType.Name)
+			}
+			continue
+		}
+	}
+	return seterr
+}
+
+var errNoDefaultValue = errors.New("no default value found")
+
+func getDefaultValue(fld *reflect.StructField, fldval *reflect.Value) (def reflect.Value, err error) {
+	val := fld.Tag.Get("default")
+	env := fld.Tag.Get("env")
+	if env != "" {
+		val = os.Getenv(env)
+	}
+	if val == "" {
+		return nilval, errNoDefaultValue
+	}
+
+	var (
+		ival  int64
+		uival uint64
+		fval  float64
+	)
+	switch fld.Type.Kind() {
+	case reflect.String:
+		return reflect.ValueOf(val), nil
+	case reflect.Int:
+		ival, err = strconv.ParseInt(val, 10, 64)
+		def = reflect.ValueOf(int(ival))
+	case reflect.Int8:
+		ival, err = strconv.ParseInt(val, 10, 8)
+		def = reflect.ValueOf(int8(ival))
+	case reflect.Int16:
+		ival, err = strconv.ParseInt(val, 10, 16)
+		def = reflect.ValueOf(int16(ival))
+	case reflect.Int32:
+		ival, err = strconv.ParseInt(val, 10, 32)
+		def = reflect.ValueOf(int32(ival))
+	case reflect.Int64:
+		ival, err = strconv.ParseInt(val, 10, 64)
+		def = reflect.ValueOf(int64(ival))
+	case reflect.Uint:
+		uival, err = strconv.ParseUint(val, 10, 64)
+		def = reflect.ValueOf(uint(uival))
+	case reflect.Uint8:
+		uival, err = strconv.ParseUint(val, 10, 8)
+		def = reflect.ValueOf(uint8(uival))
+	case reflect.Uint16:
+		uival, err = strconv.ParseUint(val, 10, 16)
+		def = reflect.ValueOf(uint16(uival))
+	case reflect.Uint32:
+		uival, err = strconv.ParseUint(val, 10, 32)
+		def = reflect.ValueOf(uint32(uival))
+	case reflect.Uint64:
+		uival, err = strconv.ParseUint(val, 10, 64)
+		def = reflect.ValueOf(uival)
+	case reflect.Float32:
+		fval, err = strconv.ParseFloat(val, 32)
+		def = reflect.ValueOf(float32(fval))
+	case reflect.Float64:
+		fval, err = strconv.ParseFloat(val, 64)
+		def = reflect.ValueOf(fval)
+	case reflect.Bool:
+		var bval bool
+		bval, err = strconv.ParseBool(val)
+		def = reflect.ValueOf(bval)
+	case reflect.Slice:
+		// TODO: figure out how to detect a []byte
+		switch fldval.Interface().(type) {
+		case []byte:
+			def = reflect.ValueOf([]byte(val))
+		default:
+			panic("don't know how to parse these yet")
+		}
+	case reflect.Complex64:
+	case reflect.Complex128:
+	case reflect.Func:
+	default:
+		return nilval, errors.New("unknown default config type")
+	}
+	if err != nil {
+		return nilval, fmt.Errorf("could not parse default value: %v", err)
+	}
+	return def, err
+}
+
 func isCorrectLabel(key string, field reflect.StructField) bool {
 	return key == field.Name ||
 		key == field.Tag.Get("config") ||
@@ -277,56 +427,11 @@ func isZero(val reflect.Value) bool {
 	)
 }
 
-func typedDefaultValue(fld *reflect.StructField, val string) (reflect.Value, error) {
-	switch fld.Type.Kind() {
-	case reflect.String:
-		return reflect.ValueOf(val), nil
-	case reflect.Int:
-		ival, err := strconv.Atoi(val)
-		if err != nil {
-			return nilval, fmt.Errorf("could not parse default value: %v", err)
-		}
-		return reflect.ValueOf(ival), nil
-	case reflect.Uint:
-		uival, err := strconv.ParseUint(val, 10, 32)
-		if err != nil {
-			return nilval, fmt.Errorf("could not parse default value: %v", err)
-		}
-		return reflect.ValueOf(uival), nil
-	case reflect.Float32:
-		fval, err := strconv.ParseFloat(val, 32)
-		if err != nil {
-			return nilval, fmt.Errorf("could not parse default value: %v", err)
-		}
-		return reflect.ValueOf(float32(fval)), nil // ParseFloat always returs float64
-	case reflect.Float64:
-		fval, err := strconv.ParseFloat(val, 64)
-		if err != nil {
-			return nilval, fmt.Errorf("could not parse default value: %v", err)
-		}
-		return reflect.ValueOf(fval), nil
-	case reflect.Bool:
-		bval, err := strconv.ParseBool(val)
-		if err != nil {
-			return nilval, fmt.Errorf("could not parse default value: %v", err)
-		}
-		return reflect.ValueOf(bval), nil
-	case reflect.Complex64:
-	case reflect.Complex128:
-	case reflect.Slice:
-	case reflect.Func:
-	}
-	return nilval, nil
-}
-
 func set(obj interface{}, key string, val interface{}) error {
 	objval := reflect.ValueOf(obj).Elem()
-	ok, _, field, err := find(objval, strings.Split(key, "."))
+	field, err := find(objval, strings.Split(key, "."))
 	if err != nil {
 		return err
-	}
-	if !ok {
-		return ErrFieldNotFound
 	}
 	if !field.CanSet() {
 		return errors.New("cannot set value")

@@ -28,17 +28,14 @@ var (
 	nilval = reflect.ValueOf(nil)
 )
 
-func init() {
-	c = &Config{}
-}
+func init() { c = &Config{} }
 
 // New creates a new config object from a configuration
 // struct.
 func New(conf interface{}) *Config {
-	return &Config{
-		config: conf,
-		elem:   reflect.ValueOf(conf).Elem(),
-	}
+	cfg := &Config{}
+	cfg.SetConfig(conf)
+	return cfg
 }
 
 // Config holds configuration metadata
@@ -54,12 +51,13 @@ type Config struct {
 }
 
 // SetConfig will set the config struct
-func SetConfig(conf interface{}) { c.SetConfig(conf) }
+func SetConfig(conf interface{}) error { return c.SetConfig(conf) }
 
 // SetConfig will set the config struct
-func (c *Config) SetConfig(conf interface{}) {
+func (c *Config) SetConfig(conf interface{}) error {
 	c.config = conf
 	c.elem = reflect.ValueOf(conf).Elem()
+	return nil
 }
 
 // GetConfig will return the the config struct that has been
@@ -182,11 +180,13 @@ func FileUsed() string { return c.FileUsed() }
 // FileUsed will return the file used for
 // configuration.
 func (c *Config) FileUsed() string {
-	dir := c.DirUsed()
-	if dir == "" {
-		return ""
+	var err error
+	for _, path := range c.paths {
+		if _, err = os.Stat(path); !os.IsNotExist(err) {
+			return filepath.Join(path, c.file)
+		}
 	}
-	return filepath.Join(dir, c.file)
+	return ""
 }
 
 // DirUsed returns the path of the first existing
@@ -194,11 +194,20 @@ func (c *Config) FileUsed() string {
 func DirUsed() string { return c.DirUsed() }
 
 // DirUsed returns the path of the first existing
-// config directory.
+// config directory. If none of the paths exist, then
+// The first non-empty path will be returned.
 func (c *Config) DirUsed() string {
-	var err error
-	for _, path := range c.paths {
+	var (
+		err  error
+		path string
+	)
+	for _, path = range c.paths {
 		if _, err = os.Stat(path); !os.IsNotExist(err) {
+			return path
+		}
+	}
+	for _, path = range c.paths {
+		if path != "" {
 			return path
 		}
 	}
