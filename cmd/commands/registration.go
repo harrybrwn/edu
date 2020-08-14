@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/gen2brain/beeep"
+	"github.com/harrybrwn/config"
 	"github.com/harrybrwn/edu/cmd/internal"
-	"github.com/harrybrwn/edu/cmd/internal/config"
 	"github.com/harrybrwn/edu/cmd/internal/files"
 	"github.com/harrybrwn/edu/cmd/internal/opts"
 	"github.com/harrybrwn/edu/cmd/internal/watch"

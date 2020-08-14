@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/harrybrwn/config"
 	"github.com/harrybrwn/edu/cmd/internal"
-	"github.com/harrybrwn/edu/cmd/internal/config"
 	"github.com/harrybrwn/edu/cmd/internal/files"
 	"github.com/spf13/cobra"
 )

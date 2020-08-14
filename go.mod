@@ -5,6 +5,7 @@ go 1.14
 require (
 	github.com/PuerkitoBio/goquery v1.5.1
 	github.com/gen2brain/beeep v0.0.0-20200526185328-e9c15c258e28
+	github.com/harrybrwn/config v0.0.2-0.20200814195558-3ea79adc48dd
 	github.com/harrybrwn/errs v0.0.2-0.20200523142445-e4279967174e
 	github.com/harrybrwn/go-canvas v0.0.2-0.20200717005121-3ae6b73185d2
 	github.com/jaytaylor/html2text v0.0.0-20200412013138-3577fbdbcff7
@@ -15,7 +16,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/ssor/bom v0.0.0-20170718123548-6386211fdfcf // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
-	gopkg.in/yaml.v2 v2.3.0
+	gopkg.in/yaml.v2 v2.3.0 // indirect
 )
 
 replace github.com/harrybrwn/go-canvas => ../../pkg/go-canvas

@@ -11,7 +11,7 @@ import (
 	"sync"
 	"text/template"
 
-	"github.com/harrybrwn/edu/cmd/internal/config"
+	"github.com/harrybrwn/config"
 	"github.com/harrybrwn/errs"
 	"github.com/spf13/cobra"
 )

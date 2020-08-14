@@ -6,7 +6,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/harrybrwn/edu/cmd/internal/config"
+	"github.com/harrybrwn/config"
 	"github.com/harrybrwn/edu/pkg/twilio"
 	"github.com/spf13/cobra"
 )
