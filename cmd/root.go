@@ -52,7 +52,12 @@ func Execute() (err error) {
 	config.SetConfig(commands.Conf)
 
 	err = config.ReadConfigFile()
-	if err != config.ErrNoConfigFile && err != nil {
+	switch err {
+	case nil:
+		break
+	case config.ErrNoConfigDir, config.ErrNoConfigFile:
+		log.Println(err)
+	default:
 		return err
 	}
 
@@ -141,10 +146,7 @@ completion. Note: for zsh you will need to use the command
 		Use:    "test",
 		Hidden: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) < 1 {
-				return errors.New("no arguments")
-			}
-			return beeep.Notify("edu", args[0], "")
+			return errors.New("test command doesn't do anything")
 		},
 	}
 
@@ -205,6 +207,7 @@ Flags:
 {{.LocalFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasAvailableInheritedFlags}}
 
 Global Flags:
+
 {{.InheritedFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasHelpSubCommands}}
 
 Additional help topics:

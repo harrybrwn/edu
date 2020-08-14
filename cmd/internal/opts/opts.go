@@ -9,7 +9,7 @@ type Global struct {
 
 // AddToFlagSet will add the flags to a flag set
 func (g *Global) AddToFlagSet(set *pflag.FlagSet) {
-	set.BoolVar(&g.NoColor, "nocolor", false, "turn of colors")
+	set.BoolVar(&g.NoColor, "nocolor", false, "turn off colors")
 }
 
 // ScheduleFlags is a collection of flag variables

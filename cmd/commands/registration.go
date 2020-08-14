@@ -217,6 +217,15 @@ func watchFiles() error {
 }
 
 func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
+	// TODO: add a setting in the config file for text msg updates with watch
+	/*
+		watch:
+			notify: true # use twilio to notify
+		twilio:
+			token: <api token>
+			sid: <api SID>
+			number: <twilio number>
+	*/
 	var (
 		subject string
 		verbose bool

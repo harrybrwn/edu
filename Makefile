@@ -1,8 +1,10 @@
 VERSION=$(shell git describe --tags --abbrev=0)-$(shell git rev-parse --short HEAD)
-GOFLAGS=-ldflags "-X $(shell go list)/cmd.version=$(VERSION)"
+GOFLAGS=-ldflags "-w -s -X $(shell go list)/cmd.version=$(VERSION)"
+GOOS ?= $(shell go env GOOS)
+GOARCH ?= $(shell go env GOARCH)
 
 build:
-	go build $(GOFLAGS)
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build $(GOFLAGS)
 
 install:
 	go install $(GOFLAGS)

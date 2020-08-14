@@ -56,17 +56,12 @@ type Config struct {
 
 // All returns all the commands.
 func All(globals *opts.Global) []*cobra.Command {
-	canvasCmd.AddCommand(
-		canvasCommands(globals)...,
-	)
-	canvasCmd.PersistentPostRun = canvasCmd.PersistentPreRun
 	all := []*cobra.Command{
 		newConfigCmd(),
 
 		newCourseCmd(globals),
 		newUserCmd(),
 
-		canvasCmd, // will be removed soon
 		newDueCmd(globals),
 		newFilesCmd(),
 		newUploadCmd(),
@@ -230,8 +225,25 @@ func newUserCmd() *cobra.Command {
 func newConfigCmd() *cobra.Command {
 	var file, edit bool
 	cmd := &cobra.Command{
-		Use:     "config",
-		Short:   "Manage configuration variables.",
+		Use:   "config",
+		Short: "Manage configuration variables.",
+		Long: `The config command helps manage program configuration variables.
+
+Configuration for this program has a static component in the for
+of a config file. The yaml formatted config file used will be
+the file named 'config.yml' that first appears in one of the
+following directores in the order that they are listed here by os:
+
+  $EDU_CONFIG
+  $XDG_CONFIG_HOME/edu
+  $HOME/.edu
+
+The environment variables listed above may changed depending on
+the operating system, for example, on windows the config directory
+($XDG_CONFIG_HOME on linux) will be found using the environment
+variable %AppData%. For more documentation of this see the go docs
+https://pkg.go.dev/os?tab=doc#UserConfigDir.
+`,
 		Aliases: []string{"conf"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			f := config.FileUsed()
@@ -258,7 +270,7 @@ func newConfigCmd() *cobra.Command {
 		Use: "get", Short: "Get a config variable",
 		Run: func(c *cobra.Command, args []string) {
 			for _, arg := range args {
-				c.Println(config.Get(arg))
+				c.Printf("%+v\n", config.Get(arg))
 			}
 		}})
 	cmd.Flags().BoolVarP(&edit, "edit", "e", false, "edit the config file")

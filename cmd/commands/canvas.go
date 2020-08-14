@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -21,8 +20,6 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"golang.org/x/net/html"
-	"golang.org/x/net/html/atom"
 )
 
 type fileFinder struct {
@@ -61,28 +58,6 @@ func (ff *fileFinder) addToFlagSet(flagset *pflag.FlagSet) {
 	flagset.StringVar(&ff.search, "search", "", "search for files by name")
 }
 
-// CanvasCommands gets all the canvas commands
-func canvasCommands(flags *opts.Global) []*cobra.Command {
-	return []*cobra.Command{
-		newFilesCmd(),
-		newDueCmd(flags),
-		newUploadCmd(),
-	}
-}
-
-var (
-	canvasCmd = &cobra.Command{
-		Use:        "canvas",
-		Hidden:     true,
-		Deprecated: "all commands moved to the main command line interface",
-		Aliases:    []string{"canv", "ca"},
-		Short:      "A small collection of helper commands for canvas",
-		PersistentPreRun: func(*cobra.Command, []string) {
-			fmt.Println(term.Colorf("%r: 'canvas' command is deprecated. Commands moved to main cli.", "Warning"))
-		},
-	}
-)
-
 type dueDate struct {
 	id, name string
 	date     time.Time
@@ -102,67 +77,35 @@ func (dd dueDates) Less(i, j int) bool {
 	return dd[i].date.Before(dd[j].date)
 }
 
-func searchForAssignment(
-	course *canvas.Course,
-	key interface{},
-	all bool,
-) (*canvas.Assignment, error) {
-	switch v := key.(type) {
-	case int:
-		return course.Assignment(v, canvas.Opt("all_dates", all))
-	case string:
-		for as := range course.Assignments(
-			canvas.Opt("search_term", v),
-			canvas.Opt("order_by", "name"),
-			canvas.Opt("all_dates", all),
-		) {
-			if as.Name == v {
-				return as, nil
-			}
-		}
-		return nil, fmt.Errorf("could not find assignment '%s'", v)
-	default:
-		return nil, fmt.Errorf("don't know how to search with %T", v)
-	}
-}
-
 func newDueCmd(flags *opts.Global) *cobra.Command {
 	var nolinks, all bool
 	dueCmd := &cobra.Command{
 		Use:   "due [id|name]",
 		Short: "List all the due date on canvas.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				as, err := internal.FindAssignment(args[0], all)
+				if err != nil {
+					return err
+				}
+				text, err := html2text.FromString(
+					as.Description,
+					html2text.Options{
+						PrettyTables: true,
+						OmitLinks:    nolinks,
+					},
+				)
+				if err != nil {
+					return err
+				}
+				cmd.Println(term.Colorf("%b %r", as.Name, as.DueAt.Local().String()), "Course ID:", as.CourseID)
+				cmd.Println(text)
+				return nil
+			}
+
 			courses, err := internal.GetCourses(false)
 			if err != nil {
 				return internal.HandleAuthErr(err)
-			}
-			if len(args) > 0 {
-				id, err := strconv.Atoi(args[0])
-				var key interface{} = id
-				if err != nil {
-					key = args[0]
-				}
-
-				for _, course := range courses {
-					as, err := searchForAssignment(course, key, all)
-					if err != nil {
-						continue
-					}
-					text, err := html2text.FromString(
-						as.Description,
-						html2text.Options{
-							PrettyTables: true,
-							OmitLinks:    nolinks,
-						},
-					)
-					if err != nil {
-						return err
-					}
-					cmd.Println(term.Colorf("%b %r", as.Name, as.DueAt.Local().String()))
-					cmd.Println(text)
-					return nil
-				}
-				return nil
 			}
 
 			// if the user has not given a crn, then we print out all the assignments
@@ -272,19 +215,38 @@ func newFilesCmd() *cobra.Command {
 
 func newUploadCmd() *cobra.Command {
 	var (
-		file       string
-		folderPath string
-		uploadAs   string
+		file         string
+		folderPath   string
+		uploadAs     string
+		assignmentID int
 	)
 	c := &cobra.Command{
 		Use:   "upload",
-		Short: "Upload a file to your canvas user account.",
+		Short: "Upload a file to your canvas account.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 && file == "" {
 				file = args[0]
 			}
 			if file == "" {
 				return errors.New("no filename given")
+			}
+			if assignmentID != 0 {
+				as, err := internal.GetAssignment(assignmentID, false)
+				if err != nil {
+					return err
+				}
+				f, err := os.Open(file)
+				if err != nil {
+					return err
+				}
+				defer f.Close()
+				cafile, err := as.SubmitOsFile(f)
+				if err != nil {
+					return err
+				}
+				fmt.Println(cafile.ID, cafile.Name())
+				fmt.Println(cafile.PreviewURL)
+				return nil
 			}
 			if folderPath != "" {
 				uploadAs = path.Join(folderPath, file)
@@ -295,7 +257,11 @@ func newUploadCmd() *cobra.Command {
 			}
 			return upload(file, uploadAs)
 		},
-		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		ValidArgsFunction: func(
+			cmd *cobra.Command,
+			args []string,
+			toComplete string,
+		) ([]string, cobra.ShellCompDirective) {
 			return args, cobra.ShellCompDirectiveDefault
 		},
 	}
@@ -306,6 +272,7 @@ func newUploadCmd() *cobra.Command {
 	flags.StringVarP(&file, "file", "f", "", "give a filename for the file to upload")
 	flags.StringVarP(&uploadAs, "upload-as", "u", "", "rename the file being uploaded")
 	flags.StringVarP(&folderPath, "folder", "d", "", "set the folder path to upload the file to")
+	flags.IntVarP(&assignmentID, "assignment-id", "a", assignmentID, "upload the file as an assignment submission")
 	return c
 }
 
@@ -327,58 +294,4 @@ func upload(filename, uploadname string) (err error) {
 	}
 	_, err = canvas.UploadFile(uploadname, file, opts...)
 	return internal.HandleAuthErr(err)
-}
-
-type iter interface {
-	Next() html.TokenType
-	Token() html.Token
-}
-
-func parseHTML(raw string) error {
-	root, err := html.Parse(strings.NewReader(raw))
-	if err != nil {
-		return err
-	}
-	// html.Render(os.Stdout, root)
-	for n := root.FirstChild; n != nil; n = n.NextSibling {
-		traverse(n, 1)
-	}
-	return nil
-}
-
-func traverse(node *html.Node, depth int) {
-	for n := node.FirstChild; n != nil; n = n.NextSibling {
-		// for i := 0; i < depth; i++ {
-		// 	print("  ")
-		// }
-		// fmt.Print(n.Type, " ")
-
-		switch n.Type {
-		case html.TextNode:
-			fmt.Print(n.Data)
-		case html.ElementNode:
-			switch n.DataAtom {
-			case atom.P:
-				printPTag(n, depth)
-			case atom.A:
-				printATag(n)
-			case atom.Br:
-				print("\n")
-			}
-		}
-		// println()
-
-		traverse(n, depth+1)
-	}
-}
-
-func printATag(node *html.Node) {
-	println()
-	print(node.FirstChild.Data)
-}
-
-func printPTag(node *html.Node, depth int) {
-	// fmt.Printf("'%s'", node.Data)
-	for n := node.FirstChild; n != nil; n = n.NextSibling {
-	}
 }

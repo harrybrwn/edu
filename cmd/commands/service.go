@@ -38,10 +38,9 @@ WantedBy=multi-user.target
 
 func genServiceCmd() *cobra.Command {
 	var (
+		name         string
 		filename     string = ""
 		templateFile string
-
-		restart, stop, start, install bool
 	)
 	c := &cobra.Command{
 		Use:    "service",
@@ -107,11 +106,7 @@ func genServiceCmd() *cobra.Command {
 	pflags := c.PersistentFlags()
 	pflags.StringVarP(&filename, "file", "f", filename, "Write the service to a file")
 	pflags.StringVar(&templateFile, "template-file", "", "Read the systemd service template from a file")
-	flags := c.Flags()
-	flags.BoolVarP(&restart, "restart", "r", restart, "Restart the systemd service")
-	flags.BoolVar(&stop, "stop", stop, "Stop the systemd service")
-	flags.BoolVar(&start, "start", start, "Start the systemd service")
-	flags.BoolVarP(&install, "install", "i", install, "Install a systemd service.")
+	pflags.StringVar(&name, "name", name, "name of the systemd service")
 	return c
 }
 
