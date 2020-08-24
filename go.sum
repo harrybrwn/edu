@@ -53,10 +53,12 @@ github.com/gorilla/websocket v1.4.0/go.mod h1:E7qHFY5m1UJ88s3WnNqhKjPHQ0heANvMoA
 github.com/grpc-ecosystem/go-grpc-middleware v1.0.0/go.mod h1:FiyG127CGDf3tlThmgyCl78X/SZQqEOJBCDaAfeWzPs=
 github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0/go.mod h1:8NvIoxWQoOIhqOTXgfV/d3M/q6VIi02HzZEHgUlZvzk=
 github.com/grpc-ecosystem/grpc-gateway v1.9.0/go.mod h1:vNeuVxBJEsws4ogUvrchl83t/GYV9WGTSLVdBhOQFDY=
-github.com/harrybrwn/config v0.0.2-0.20200814195558-3ea79adc48dd h1:O8nHz6UYGCVL7Afvebr8JGj2uQ6z/4FRJ2/WgpMCvN0=
-github.com/harrybrwn/config v0.0.2-0.20200814195558-3ea79adc48dd/go.mod h1:Qx/o16iSaWA6/rj1mwKY0MUyrb2YCUVY5iqKcEWSraA=
+github.com/harrybrwn/config v0.0.2-0.20200818072909-bbe4f5c43a4a h1:qpKg5MO/06Eb/5OgIcEJIBiU7DkrHWI0n67badAJHoM=
+github.com/harrybrwn/config v0.0.2-0.20200818072909-bbe4f5c43a4a/go.mod h1:Qx/o16iSaWA6/rj1mwKY0MUyrb2YCUVY5iqKcEWSraA=
 github.com/harrybrwn/errs v0.0.2-0.20200523142445-e4279967174e h1:RtaB1O5oXuA5jbz3TprWGk3KcfsaS5pkBnanTARjXSI=
 github.com/harrybrwn/errs v0.0.2-0.20200523142445-e4279967174e/go.mod h1:xekiTrup1h5u3YF9bpJT7qD1cmgYBA8qN9iHd/h/sho=
+github.com/harrybrwn/go-canvas v0.0.2-0.20200821044925-04b08bcecf29 h1:/aL4+pznAb3w4Vxc2BixmShPeDW5X/FL+iQKqRqZzUM=
+github.com/harrybrwn/go-canvas v0.0.2-0.20200821044925-04b08bcecf29/go.mod h1:bC9IrjKdu7XVstPy+lAvPYH07W3TgD6m796BjqF5QWo=
 github.com/harrybrwn/go-querystring v1.0.1-0.20200812230556-de172bc021ad h1:1aAZGfm8SrKkfVODudFMNcDNq2eflHTxFXqjzucxNOA=
 github.com/harrybrwn/go-querystring v1.0.1-0.20200812230556-de172bc021ad/go.mod h1:vgIvUzro/BNvc4qAmR133SLQZDvURWGxCesSpBnjeQc=
 github.com/hashicorp/hcl v1.0.0 h1:0Anlzjpi4vEasTeNFn2mLJgTSwt0+6sfsiTG8qcWGx4=
@@ -87,6 +89,8 @@ github.com/mitchellh/mapstructure v1.1.2 h1:fmNYVwqnSfB9mZU6OS2O6GsXM+wcskZDuKQz
 github.com/mitchellh/mapstructure v1.1.2/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
 github.com/mitchellh/mapstructure v1.3.2 h1:mRS76wmkOn3KkKAyXDu42V+6ebnXWIztFSYGN7GeoRg=
 github.com/mitchellh/mapstructure v1.3.2/go.mod h1:bFUtVrKA4DC2yAKiSyO/QUcy7e+RRV2QTWOzhPopBRo=
+github.com/mitchellh/mapstructure v1.3.3 h1:SzB1nHZ2Xi+17FP0zVQBHIZqvwRN9408fJO8h+eeNA8=
+github.com/mitchellh/mapstructure v1.3.3/go.mod h1:bFUtVrKA4DC2yAKiSyO/QUcy7e+RRV2QTWOzhPopBRo=
 github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
 github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d h1:VhgPp6v9qf9Agr/56bj7Y/xa04UccTW04VP0Qed4vnQ=
 github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d/go.mod h1:YUTz3bUH2ZwIWBy3CJBeOBEugqcmXREj14T+iG/4k4U=

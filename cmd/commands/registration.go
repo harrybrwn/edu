@@ -16,6 +16,7 @@ import (
 	"github.com/harrybrwn/edu/cmd/internal/opts"
 	"github.com/harrybrwn/edu/cmd/internal/watch"
 	"github.com/harrybrwn/edu/pkg/term"
+	"github.com/harrybrwn/edu/pkg/twilio"
 	"github.com/harrybrwn/edu/school/ucmerced/ucm"
 	"github.com/harrybrwn/errs"
 	"github.com/mitchellh/mapstructure"
@@ -220,17 +221,18 @@ func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
 	// TODO: add a setting in the config file for text msg updates with watch
 	/*
 		watch:
-			notify: true # use twilio to notify
+			sms_notify: true # use twilio to notify
 		twilio:
 			token: <api token>
 			sid: <api SID>
 			number: <twilio number>
 	*/
 	var (
-		subject string
-		verbose bool
-		term    = config.GetString("watch.term")
-		year    = config.GetInt("watch.year")
+		subject   string
+		verbose   bool
+		term      = config.GetString("watch.term")
+		year      = config.GetInt("watch.year")
+		smsNotify = config.GetBool("watch.sms_notify")
 	)
 	if term != "" {
 		sflags.term = term
@@ -291,8 +293,11 @@ func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
 			}
 		},
 	}
-	c.Flags().BoolVarP(&verbose, "verbose", "v", verbose, "print out any errors")
-	c.Flags().StringVar(&subject, "subject", "", "check the CRNs for a specific subject")
+
+	flg := c.Flags()
+	flg.BoolVarP(&verbose, "verbose", "v", verbose, "print out any errors")
+	flg.StringVar(&subject, "subject", "", "check the CRNs for a specific subject")
+	flg.BoolVar(&smsNotify, "sms-notify", smsNotify, "notify users when classes are open using sms")
 	return c
 }
 
@@ -318,6 +323,17 @@ func checkCRNList(crns []int, subject string, sflags *scheduleFlags) error {
 	}
 	if config.GetBool("notifications") {
 		return beeep.Notify("Found Open Courses", msg, "")
+	}
+	if config.GetBool("watch.sms_notify") {
+		twilio := twilio.NewClient(
+			config.GetString("twilio.sid"),
+			config.GetString("twilio.token"),
+		)
+		twilio.SetSender(config.GetString("twilio.number"))
+		_, err := twilio.SendFrom(config.GetString("twilio.number"), "", msg)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

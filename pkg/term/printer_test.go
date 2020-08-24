@@ -1,7 +1,6 @@
 package term
 
 import (
-	"runtime"
 	"testing"
 )
 
@@ -12,9 +11,6 @@ func Test(t *testing.T) {
 }
 
 func TestColorf(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("will not work on windows")
-	}
 	tests := []struct {
 		fmt, exp string
 	}{

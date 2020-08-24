@@ -51,6 +51,15 @@ watch:
   # see registration.year
   year: 2021
 
+# The Twilio object holds all of the twilio api variables
+twilio:
+  # api token (also looks for $TWILIO_TOKEN)
+  token: '...'
+  # api SID (also looks for $TWILIO_SID)
+  sid: '...'
+  # The number provided by twilio
+  number: '+11231234'
+
 # replacements is a list of Regex patterns that can change file
 # download paths.
 # For an in-depth overview of the specific regular expression

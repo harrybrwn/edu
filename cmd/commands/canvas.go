@@ -164,7 +164,9 @@ func (p *assignmentPrinter) printCourse(course *canvas.Course) {
 	for _, d := range dates {
 		p.tab.Append([]string{d.id, d.name, d.date.Format(time.RFC822)})
 	}
-	p.tab.Render()
+	if p.tab.NumLines() > 0 {
+		p.tab.Render()
+	}
 	p.tab.ClearRows()
 	fmt.Fprintf(p.w, "\n")
 
@@ -191,6 +193,12 @@ func newFilesCmd() *cobra.Command {
 			count := 0
 
 			for _, course := range courses {
+				course.SetErrorHandler(func(err error) error {
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
+					}
+					return err
+				})
 				if course.AccessRestrictedByDate {
 					fmt.Fprintf(
 						os.Stderr, "Access to %d %s has been restricted to a certain date\n",
@@ -221,7 +229,7 @@ func newUploadCmd() *cobra.Command {
 		assignmentID int
 	)
 	c := &cobra.Command{
-		Use:   "upload",
+		Use:   "upload <file>",
 		Short: "Upload a file to your canvas account.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 && file == "" {

@@ -143,6 +143,16 @@ func (cd *CourseDownloader) filesGenerator(course *canvas.Course) <-chan *filePa
 	)
 	go func() {
 		defer close(ch)
+		course.SetErrorHandler(func(e error) error {
+			if e != nil {
+				fmt.Fprintf(os.Stderr, "Warning: not authorized to get files for \"%s\"\n", course.Name)
+			}
+			return e
+		})
+		// perm, err := course.Permissions()
+		// if err != nil {
+		// 	panic(err)
+		// }
 		for file := range course.Files() {
 			pair := &filePathPair{file: file}
 			folder, ok := dirmap[file.FolderID]

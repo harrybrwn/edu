@@ -13,6 +13,7 @@ var (
 	escape string
 )
 
+// Forground colors
 const (
 	FgBlack = iota + 30
 	FgRed
@@ -24,6 +25,7 @@ const (
 	FgWhite
 )
 
+// Format modifiers
 const (
 	Reset = iota
 	Bold

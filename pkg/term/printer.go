@@ -29,7 +29,7 @@ import (
 //	%?r - red inverted
 //	% r - red hidden
 //	%-r - red crossed out
-func Colorf(format string, a ...string) string {
+func Colorf(format string, a ...interface{}) string {
 	var (
 		modifier int
 		color    int
@@ -88,11 +88,17 @@ func Colorf(format string, a ...string) string {
 		} else {
 			fmt.Fprintf(buf, "%s[%dm", escape, color)
 		}
-		buf.WriteString(a[arg])
+		buf.WriteString(fmt.Sprintf("%v", a[arg]))
 		fmt.Fprintf(buf, "%s[0m", escape)
 		arg++
 	}
 	return buf.String()
+}
+
+// ColorPrintf is the same as Colorf except it prints the result
+// to standar out.
+func ColorPrintf(format string, v ...interface{}) {
+	fmt.Printf(Colorf(format, v...))
 }
 
 func getForground(code byte) int {

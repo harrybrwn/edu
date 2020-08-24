@@ -179,7 +179,7 @@ func errorMessage(err error) {
 func errorHandler(e error) error {
 	if e != nil {
 		errmsg(e.Error())
-		os.Exit(1)
+		os.Exit(2)
 	}
 	return nil
 }
