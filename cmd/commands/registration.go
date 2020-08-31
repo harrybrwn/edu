@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -17,9 +18,12 @@ import (
 	"github.com/harrybrwn/edu/cmd/internal/watch"
 	"github.com/harrybrwn/edu/pkg/term"
 	"github.com/harrybrwn/edu/pkg/twilio"
+	"github.com/harrybrwn/edu/school"
+	"github.com/harrybrwn/edu/school/schedule"
 	"github.com/harrybrwn/edu/school/ucmerced/ucm"
 	"github.com/harrybrwn/errs"
 	"github.com/mitchellh/mapstructure"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -40,7 +44,7 @@ func (sf *scheduleFlags) install(fset *pflag.FlagSet) {
 
 var regHeader = []string{
 	"crn",
-	"code",
+	"name", // "code",
 	"seats open",
 	"activity",
 	"title",
@@ -84,10 +88,12 @@ registration information.`,
 					return err
 				}
 			}
-			schedule, err := ucm.BySubject(
-				sflags.year, sflags.term,
-				subj, sflags.open,
-			) // still works with an empty subj
+			schedule, err := schedule.New(school.UCMerced, &schedule.Config{
+				Year:         sflags.year,
+				Term:         sflags.term,
+				CourseName:   subj,
+				FilterClosed: sflags.open,
+			})
 			if err != nil {
 				return err
 			}
@@ -95,7 +101,17 @@ registration information.`,
 			tab := internal.NewTable(cmd.OutOrStdout())
 			internal.SetTableHeader(tab, regHeader, !sflags.NoColor)
 			tab.SetAutoWrapText(false)
-			for _, c := range schedule.Ordered() {
+			if schedule.Len() == 0 {
+				return &internal.Error{Msg: "no courses found", Code: 1}
+			}
+			var courses []*ucm.Course
+			if sc, ok := schedule.(*ucm.Schedule); ok {
+				courses = sc.Ordered()
+			} else {
+				panic("don't yet support other schools")
+			}
+
+			for _, c := range courses {
 				if num != 0 && c.Number != num {
 					continue
 				}
@@ -116,7 +132,9 @@ registration information.`,
 func newCheckCRNCmd(sflags *scheduleFlags) *cobra.Command {
 	var subject string
 	cmd := &cobra.Command{
-		Use: "check-crns",
+		Use:        "check-crns",
+		Hidden:     true,
+		Deprecated: "",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			schedule, err := ucm.BySubject(sflags.year, sflags.term, subject, true)
 			if err != nil {
@@ -134,11 +152,16 @@ func newCheckCRNCmd(sflags *scheduleFlags) *cobra.Command {
 			internal.SetTableHeader(tab, header, !sflags.NoColor)
 			tab.SetAutoWrapText(false)
 			for _, crn := range crns {
-				course, ok := schedule[crn]
-				if !ok {
+				course := schedule.Get(crn)
+				if course == nil {
 					continue
 				}
-				tab.Append(courseRow(course, false, *sflags))
+				crs, ok := course.(*ucm.Course)
+				if !ok {
+					fmt.Fprintf(os.Stderr, "Warning: only uc merced is supported\n")
+					continue
+				}
+				tab.Append(courseRow(crs, false, *sflags))
 			}
 			if tab.NumLines() == 0 {
 				return &internal.Error{Msg: fmt.Sprintf("could not find %v in schedule", crns), Code: 1}
@@ -157,6 +180,7 @@ type crnWatcher struct {
 	subject string
 	flags   scheduleFlags
 	verbose bool
+	twilio  *twilio.Client
 }
 
 func (cw *crnWatcher) Watch() error {
@@ -180,12 +204,51 @@ func (cw *crnWatcher) Watch() error {
 	if len(crns) < 1 {
 		return errors.New("no crns to check (see 'edu config' watch settings)")
 	}
-	err := checkCRNList(crns, subject, &cw.flags)
+	err := cw.checkCRNs(crns, subject)
 	if err != nil {
 		if cw.verbose {
 			fmt.Println(err)
 		}
 		return err
+	}
+	return nil
+}
+
+func (cw *crnWatcher) checkCRNs(crns []int, subject string) error {
+	schedule, err := ucm.BySubject(cw.flags.year, cw.flags.term, cw.subject, true)
+	if err != nil {
+		return err
+	}
+	openCrns := make([]int, 0)
+	for _, crn := range crns {
+		_, ok := schedule[crn]
+		if !ok {
+			continue
+		}
+		openCrns = append(openCrns, crn)
+	}
+	// return if no open classes
+	if len(openCrns) == 0 {
+		return &internal.Error{Msg: fmt.Sprintf("could not find %v in schedule", crns), Code: 1}
+	}
+	msg := "Open crns:\n"
+	for _, crn := range openCrns {
+		msg += fmt.Sprintf("%d\n", crn)
+	}
+	// desktop notification
+	if config.GetBool("notifications") {
+		if err = beeep.Notify("Found Open Courses", msg, ""); err != nil {
+			return err
+		}
+	}
+	// sms notification
+	if cw.twilio != nil {
+		to := config.GetString("watch.sms_recipient")
+		_, err = cw.twilio.Send(to, msg)
+		if err != nil {
+			logrus.WithError(err).Error("could not send sms")
+			return err
+		}
 	}
 	return nil
 }
@@ -218,21 +281,13 @@ func watchFiles() error {
 }
 
 func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
-	// TODO: add a setting in the config file for text msg updates with watch
-	/*
-		watch:
-			sms_notify: true # use twilio to notify
-		twilio:
-			token: <api token>
-			sid: <api SID>
-			number: <twilio number>
-	*/
 	var (
-		subject   string
-		verbose   bool
-		term      = config.GetString("watch.term")
-		year      = config.GetInt("watch.year")
-		smsNotify = config.GetBool("watch.sms_notify")
+		subject      string
+		verbose      bool
+		term         = config.GetString("watch.term")
+		year         = config.GetInt("watch.year")
+		smsNotify    = config.GetBool("watch.sms_notify")
+		smsRecipient string
 	)
 	if term != "" {
 		sflags.term = term
@@ -262,6 +317,15 @@ func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
 				subject: subject,
 				flags:   *sflags,
 				verbose: verbose,
+				twilio: twilio.NewClient(
+					config.GetString("twilio.sid"),
+					config.GetString("twilio.token"),
+				),
+			}
+
+			crnWatch.twilio.SetSender(config.GetString("twilio.number"))
+			if !smsNotify {
+				crnWatch.twilio = nil
 			}
 
 			var watches = []watch.Watcher{crnWatch}
@@ -278,7 +342,7 @@ func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
 				}
 				time.Sleep(duration)
 
-				// refresh variables from config
+				// refresh config variables
 				if err = config.ReadConfigFile(); err != nil {
 					log.Printf("could not refresh config during 'watch': %v", err)
 				}
@@ -291,6 +355,7 @@ func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
 					}
 				}
 			}
+			// end RunE
 		},
 	}
 
@@ -298,55 +363,27 @@ func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
 	flg.BoolVarP(&verbose, "verbose", "v", verbose, "print out any errors")
 	flg.StringVar(&subject, "subject", "", "check the CRNs for a specific subject")
 	flg.BoolVar(&smsNotify, "sms-notify", smsNotify, "notify users when classes are open using sms")
+	flg.StringVar(&smsRecipient, "sms-recipient", "", "number that will be notified via sms (see sms-notify)")
 	return c
 }
 
-func checkCRNList(crns []int, subject string, sflags *scheduleFlags) error {
-	schedule, err := ucm.BySubject(sflags.year, sflags.term, subject, true)
-	if err != nil {
-		return err
-	}
-	openCrns := make([]int, 0)
-	for _, crn := range crns {
-		_, ok := schedule[crn]
-		if !ok {
-			continue
+func courseRow(crs school.Course, title bool, flags scheduleFlags) []string {
+	var (
+		timeStr  = "TBD"
+		activity = "none"
+		days     = ""
+	)
+	if c, ok := crs.(*ucm.Course); ok {
+		if c.Time.Start.Hour() != 0 && c.Time.End.Hour() != 0 {
+			timeStr = fmt.Sprintf("%s-%s",
+				c.Time.Start.Format("3:04pm"),
+				c.Time.End.Format("3:04pm"))
 		}
-		openCrns = append(openCrns, crn)
+		days = strjoin(c.Days, ",")
+		activity = c.Activity
 	}
-	if len(openCrns) == 0 {
-		return &internal.Error{Msg: fmt.Sprintf("could not find %v in schedule", crns), Code: 1}
-	}
-	msg := "Open crns:\n"
-	for _, crn := range openCrns {
-		msg += fmt.Sprintf("%d\n", crn)
-	}
-	if config.GetBool("notifications") {
-		return beeep.Notify("Found Open Courses", msg, "")
-	}
-	if config.GetBool("watch.sms_notify") {
-		twilio := twilio.NewClient(
-			config.GetString("twilio.sid"),
-			config.GetString("twilio.token"),
-		)
-		twilio.SetSender(config.GetString("twilio.number"))
-		_, err := twilio.SendFrom(config.GetString("twilio.number"), "", msg)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
-func courseRow(c *ucm.Course, title bool, flags scheduleFlags) []string {
-	var timeStr = "TBD"
-	if c.Time.Start.Hour() != 0 && c.Time.End.Hour() != 0 {
-		timeStr = fmt.Sprintf("%s-%s",
-			c.Time.Start.Format("3:04pm"),
-			c.Time.End.Format("3:04pm"))
-	}
-	days := strjoin(c.Days, ",")
-	seats := c.SeatsOpen()
+	seats := crs.SeatsOpen()
 	var open = strconv.Itoa(seats)
 	if !flags.NoColor {
 		if seats <= 0 {
@@ -358,20 +395,21 @@ func courseRow(c *ucm.Course, title bool, flags scheduleFlags) []string {
 
 	if title {
 		return []string{
-			strconv.Itoa(c.CRN),
-			c.Fullcode,
+			strconv.Itoa(crs.ID()),
+			cleanTitle(crs.Name()),
 			open,
-			c.Activity,
-			cleanTitle(c.Title),
+			activity,
+			"",
 			timeStr,
 			days,
 		}
 	}
 	return []string{
-		strconv.Itoa(c.CRN),
-		c.Fullcode,
+		strconv.Itoa(crs.ID()),
+		// crs.Fullcode,
+		"",
 		open,
-		c.Activity,
+		activity,
 		timeStr,
 		days,
 	}

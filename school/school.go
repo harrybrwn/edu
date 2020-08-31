@@ -15,7 +15,7 @@ const (
 )
 
 // Course is an interface that defines a generic
-// course object for a school schedule.
+// course object for school schedules.
 type Course interface {
 	SeatsOpen() int
 	Name() string
@@ -27,6 +27,7 @@ type Course interface {
 type Schedule interface {
 	Courses() []Course
 	Get(id int) Course
+	Len() int
 }
 
 // FromName returns a school code based on the name of

@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"log"
+	stdlog "log"
 	"os"
 	"path/filepath"
 
@@ -14,6 +14,7 @@ import (
 	"github.com/harrybrwn/errs"
 	"github.com/harrybrwn/go-canvas"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
@@ -43,11 +44,13 @@ func Stop(message interface{}) {
 
 // Execute will execute the root comand on the cli
 func Execute() (err error) {
+	stdlog.SetOutput(Logger)
 	log.SetOutput(Logger)
+	log.SetFormatter(&log.TextFormatter{})
 
 	config.SetFilename("config.yml")
 	config.SetType("yaml")
-	config.AddPath("$EDU_CONFIG")
+	config.AddPath("$EDU_CONFIG") // should work with windows %EDU_CONFIG%
 	config.AddDefaultDirs("edu")
 	config.SetConfig(commands.Conf)
 
@@ -66,7 +69,7 @@ func Execute() (err error) {
 		Logger.Filename = filepath.Join(filepath.Dir(configfile), "logs", "edu.log")
 	}
 
-	beeep.DefaultDuration = 800
+	beeep.DefaultDuration = 1000
 	root := &cobra.Command{
 		Use:           "edu <command>",
 		SilenceErrors: true,

@@ -23,7 +23,7 @@ func newTextCmd() *cobra.Command {
 		Short:  "Send a text message using the twilio api.",
 		Long: "Send a text message using the twilio api.\n" +
 			"All arguments will be sent as the text message.\n\n" +
-			"Must set the 'twilio_number' config variable.",
+			"Must set the 'twilio.number' config variable.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var msg string
 			if file != "" {

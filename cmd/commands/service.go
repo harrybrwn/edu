@@ -68,7 +68,7 @@ func genServiceCmd() *cobra.Command {
 	}
 
 	c.AddCommand(&cobra.Command{
-		Use: "install", Short: "Create a service and install it.",
+		Use: "install", Short: "Create a service and install it",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if filename == "" {
 				filename = filepath.Join(os.TempDir(), "edu.service")
@@ -85,7 +85,7 @@ func genServiceCmd() *cobra.Command {
 			return installService(filename)
 		},
 	}, &cobra.Command{
-		Use: "delete", Short: "Delete the service",
+		Use: "uninstall", Short: "Delete the service from systemd",
 		RunE: func(*cobra.Command, []string) error {
 			return errs.Chain(
 				sudo("systemctl", "stop", "edu"),

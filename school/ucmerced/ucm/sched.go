@@ -62,6 +62,11 @@ func (s *Schedule) Courses() []school.Course {
 	return courses
 }
 
+// Len returns the number of courses in the schedule
+func (s *Schedule) Len() int {
+	return len(*s)
+}
+
 // Ordered will return a slice of courses that preserves
 // the original order.
 func (s *Schedule) Ordered() []*Course {
@@ -75,9 +80,11 @@ func (s *Schedule) Ordered() []*Course {
 // Course holds data for a specific
 // course that has been parsed from the courses table.
 type Course struct {
-	CRN      int
+	CRN int
+	// comprised of the subject code and course number
 	Fullcode string
-	Number   int
+	// course number
+	Number int
 
 	Title    string
 	Units    int
@@ -105,7 +112,7 @@ func (c *Course) ID() int {
 
 // Name returns the courses title
 func (c *Course) Name() string {
-	return c.Title
+	return fmt.Sprintf("%s %s", c.Fullcode, c.Title)
 }
 
 // CourseNumber returns the number used to semantically

@@ -24,29 +24,30 @@ var Conf = &Config{}
 
 // Config is the main configuration struct
 type Config struct {
-	Host    string `yaml:"host" default:"canvas.instructure.com"`
-	Editor  string `yaml:"editor" env:"EDITOR"`
-	BaseDir string `yaml:"basedir" default:"$HOME/.edu/files"`
-	Token   string `yaml:"token" env:"CANVAS_TOKEN"`
+	Host          string `yaml:"host" default:"canvas.instructure.com"`
+	Editor        string `yaml:"editor" env:"EDITOR"`
+	BaseDir       string `yaml:"basedir" default:"$HOME/.edu/files"`
+	Token         string `yaml:"token" env:"CANVAS_TOKEN"`
+	Notifications bool   `yaml:"notifications" default:"true"`
 
-	TwilioNumber string `yaml:"twilio_number"`
-	Twilio       struct {
+	Twilio struct {
 		SID    string `yaml:"sid" env:"TWILIO_SID"`
 		Token  string `yaml:"token" env:"TWILIO_TOKEN"`
 		Number string `yaml:"number"`
 	} `yaml:"twilio"`
-	Notifications bool `yaml:"notifications" default:"true"`
-	Registration  struct {
+	Registration struct {
 		Term string `yaml:"term"`
 		Year int    `yaml:"year"`
 	} `yaml:"registration"`
 	Watch struct {
-		Duration string `yaml:"duration" default:"12h"`
-		CRNs     []int  `yaml:"crns"`
-		Term     string `yaml:"term"`
-		Year     int    `yaml:"year"`
-		Files    bool   `yaml:"files"`
-		Subject  string `yaml:"subject"`
+		Duration     string `yaml:"duration" default:"12h"`
+		CRNs         []int  `yaml:"crns"`
+		Term         string `yaml:"term"`
+		Year         int    `yaml:"year"`
+		Files        bool   `yaml:"files"`
+		Subject      string `yaml:"subject"`
+		SmsNotify    bool   `yaml:"sms_notify"`
+		SmsRecipient string `yaml:"sms_recipient"`
 	} `yaml:"watch"`
 	Replacements       []files.Replacement            `yaml:"replacements"`
 	CourseReplacements map[string][]files.Replacement `yaml:"course-replacements"`
@@ -141,7 +142,11 @@ func newCourseCmd(globals *opts.Global) *cobra.Command {
 			FoundCourse:
 			}
 
-			cmd.Printf("%d %s\n", course.ID, term.Colorf("%m", course.Name))
+			courseName := term.Colorf("%m", course.Name)
+			if globals.NoColor {
+				courseName = course.Name
+			}
+			cmd.Printf("%d %s\n", course.ID, courseName)
 			tab := internal.NewTable(cmd.OutOrStdout())
 
 			if users {
@@ -198,9 +203,7 @@ func newUserCmd() *cobra.Command {
 		Hidden: true,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			var user *canvas.User
-			opts := []canvas.Option{
-				canvas.IncludeOpt("enrollments"),
-			}
+			opts := []canvas.Option{canvas.IncludeOpt("enrollments")}
 
 			if len(args) == 0 {
 				user, err = canvas.CurrentUser(opts...)

@@ -87,6 +87,11 @@ func (c *Catalog) Get(id int) school.Course {
 	return course
 }
 
+// Len gets the length of the catalog
+func (c *Catalog) Len() int {
+	panic("TODO: find out how to get catalog length")
+}
+
 // Items is a slice of Item structs
 type Items []Item
 

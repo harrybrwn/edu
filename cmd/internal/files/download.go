@@ -43,6 +43,7 @@ func Download(
 		} else {
 			fmt.Fprintf(stdout, "Downloaded %s\n", filename)
 		}
+		log.Printf("Downloaded %s\n", filename)
 	}()
 	fmt.Fprintf(stdout, "Fetching %s\n", filename)
 	_, err = file.WriteTo(osfile) // download the contents to the file
