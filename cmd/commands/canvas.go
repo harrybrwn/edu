@@ -3,21 +3,18 @@ package commands
 import (
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
-	"strconv"
 	"sync"
 	"time"
 
 	"github.com/harrybrwn/edu/cmd/internal"
 	"github.com/harrybrwn/edu/cmd/internal/opts"
+	"github.com/harrybrwn/edu/cmd/print"
 	"github.com/harrybrwn/edu/pkg/term"
 	"github.com/harrybrwn/go-canvas"
 	"github.com/jaytaylor/html2text"
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -103,7 +100,7 @@ func newDueCmd(flags *opts.Global) *cobra.Command {
 				return nil
 			}
 
-			courses, err := internal.GetCourses(false)
+			courses, err := internal.GetCourses(false, canvas.Opt("order_by", "name"))
 			if err != nil {
 				return internal.HandleAuthErr(err)
 			}
@@ -114,16 +111,17 @@ func newDueCmd(flags *opts.Global) *cobra.Command {
 			tab := internal.NewTable(cmd.OutOrStdout())
 			tab.SetAutoWrapText(false)
 			internal.SetTableHeader(tab, []string{"id", "name", "due"}, !flags.NoColor)
+			tab.SetAutoWrapText(true)
+			tab.SetColWidth(50)
 
-			printer := &assignmentPrinter{
-				w:   cmd.OutOrStdout(),
-				tab: tab,
-				wg:  &wg,
-				all: all,
-				now: time.Now(),
+			printer := &print.AssignmentPrinter{
+				Writer:    cmd.OutOrStdout(),
+				WaitGroup: &wg,
+				Table:     tab,
+				Now:       time.Now(),
 			}
 			for _, course := range courses {
-				go printer.printCourse(course)
+				go printer.PrintCourseAssignments(course, all)
 			}
 			wg.Wait()
 			return nil
@@ -132,47 +130,6 @@ func newDueCmd(flags *opts.Global) *cobra.Command {
 	dueCmd.Flags().BoolVar(&nolinks, "no-links", false, "hide links from assignment description")
 	dueCmd.Flags().BoolVarP(&all, "all", "a", false, "show all the assignments")
 	return dueCmd
-}
-
-type assignmentPrinter struct {
-	w       io.Writer
-	tab     *tablewriter.Table
-	tableMu sync.Mutex
-	wg      *sync.WaitGroup
-	all     bool
-	now     time.Time
-}
-
-func (p *assignmentPrinter) printCourse(course *canvas.Course) {
-	var dates dueDates
-	for as := range course.Assignments(canvas.Opt("order_by", "due_at")) {
-		dueAt := as.DueAt.Local()
-		if !p.all && dueAt.Before(p.now) {
-			continue
-		}
-		dates = append(dates, dueDate{
-			id:   strconv.Itoa(as.ID),
-			name: as.Name,
-			date: dueAt,
-		})
-	}
-	sort.Sort(dates)
-
-	// rendering
-	p.tableMu.Lock()
-	fmt.Fprintln(p.w, term.Colorf("  %m", course.Name))
-	for _, d := range dates {
-		p.tab.Append([]string{d.id, d.name, d.date.Format(time.RFC822)})
-	}
-	if p.tab.NumLines() > 0 {
-		p.tab.Render()
-	}
-	p.tab.ClearRows()
-	fmt.Fprintf(p.w, "\n")
-
-	// clean up
-	p.tableMu.Unlock()
-	p.wg.Done()
 }
 
 func newFilesCmd() *cobra.Command {
@@ -197,7 +154,7 @@ func newFilesCmd() *cobra.Command {
 					if err != nil {
 						fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
 					}
-					return err
+					return nil
 				})
 				if course.AccessRestrictedByDate {
 					fmt.Fprintf(

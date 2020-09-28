@@ -1,10 +1,15 @@
+# Build
 edu
 /vendor
 /dist
 /misc
-/scripts
 
+# Notes
+TODO*
 *.txt
 *.json
+
+# Scripts
 *.service
 /upload.sh
+/scripts/

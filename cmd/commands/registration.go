@@ -42,9 +42,9 @@ func (sf *scheduleFlags) install(fset *pflag.FlagSet) {
 	fset.BoolVar(&sf.open, "open", sf.open, "only get classes that have seats open")
 }
 
-var regHeader = []string{
+var courseTableHeader = []string{
 	"crn",
-	"name", // "code",
+	"name", // "code"
 	"seats open",
 	"activity",
 	"title",
@@ -99,7 +99,7 @@ registration information.`,
 			}
 
 			tab := internal.NewTable(cmd.OutOrStdout())
-			internal.SetTableHeader(tab, regHeader, !sflags.NoColor)
+			internal.SetTableHeader(tab, courseTableHeader, !sflags.NoColor)
 			tab.SetAutoWrapText(false)
 			if schedule.Len() == 0 {
 				return &internal.Error{Msg: "no courses found", Code: 1}
@@ -406,7 +406,6 @@ func courseRow(crs school.Course, title bool, flags scheduleFlags) []string {
 	}
 	return []string{
 		strconv.Itoa(crs.ID()),
-		// crs.Fullcode,
 		"",
 		open,
 		activity,

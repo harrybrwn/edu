@@ -157,27 +157,6 @@ func FindAssignment(identifier string, all bool, opts ...canvas.Option) (*canvas
 						}
 					}
 				}
-
-				// for as := range c.Assignments(
-				// 	canvas.Opt("search_term", identifier),
-				// 	canvas.Opt("order_by", "name"),
-				// 	canvas.Opt("all_dates", all),
-				// ) {
-				// 	select {
-				// 	case <-done:
-				// 		return
-				// 	default:
-				// 	}
-				// 	if as.Name == identifier {
-				// 		ch <- as
-				// 	} else if strings.ToLower(as.Name) == idLower {
-				// 		ch <- as
-				// 	} else if as.QuizID == id { // be carfull here, if there is no quiz it will be 0
-				// 		ch <- as
-				// 	} else if strings.HasPrefix(as.Name, identifier) {
-				// 		ch <- as
-				// 	}
-				// }
 			}(c)
 
 			// remember we set `id` to -1 if identifier was not an int
