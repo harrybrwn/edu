@@ -16,5 +16,6 @@ require (
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/pflag v1.0.5
 	github.com/ssor/bom v0.0.0-20170718123548-6386211fdfcf // indirect
+	golang.org/x/net v0.0.0-20200202094626-16171245cfb2
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )

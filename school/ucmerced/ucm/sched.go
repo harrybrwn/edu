@@ -13,6 +13,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/harrybrwn/edu/school"
 	"github.com/harrybrwn/errs"
+	"golang.org/x/net/html"
 )
 
 const selector = "div.pagebodydiv table.datadisplaytable tr"
@@ -83,10 +84,17 @@ type Course struct {
 	CRN int
 	// comprised of the subject code and course number
 	Fullcode string
+
+	// Course subject code
+	Subject string
 	// course number
 	Number int
+	// Lab or Discussion section. If the object is
+	// a lecture then this should be 01
+	Section string
+	Title   string
 
-	Title    string
+	Exam     *Exam
 	Units    int
 	Activity string
 	Days     []time.Weekday
@@ -95,7 +103,10 @@ type Course struct {
 	}
 	BuildingRoom string
 	StartEnd     string
-	Instructor   string
+	Date         struct {
+		Start, End time.Time
+	}
+	Instructor string
 
 	MaxEnrolled    int
 	ActiveEnrolled int
@@ -103,6 +114,16 @@ type Course struct {
 	timeStr string
 	seats   string
 	order   int
+}
+
+// Exam is a course exam
+type Exam struct {
+	Day      time.Weekday
+	Building string
+	Date     time.Time
+	Time     struct {
+		Start, End time.Time
+	}
 }
 
 // ID returns the course's crn
@@ -142,6 +163,11 @@ func BySubject(year int, term, subject string, open bool) (Schedule, error) {
 	return getSchedule(year, term, subject, open)
 }
 
+var (
+	errNotACourse   = errors.New("not a course")
+	errPrevNotFound = errors.New("crn not found in previous html element")
+)
+
 // bySubject gets the schedule and only one subject given a subject code.
 func getSchedule(year int, term, subject string, open bool) (Schedule, error) {
 	resp, err := getData(fmt.Sprintf("%d", year), term, strings.ToUpper(subject), open)
@@ -157,78 +183,137 @@ func getSchedule(year int, term, subject string, open bool) (Schedule, error) {
 	if err != nil {
 		return nil, err
 	}
-	selection := doc.Find(selector)
-	schedule := Schedule{}
-	keys := make([]string, 13)
+	const selector = "div.pagebodydiv table.datadisplaytable tr"
 	var (
-		keyerr error
-		order  = 0
+		selection        = doc.Find(selector)
+		schedule         = Schedule{}
+		keys             = make([]string, 13)
+		keyerr, parseErr error
+		order            = 0
 	)
 
 	selection.Each(func(i int, s *goquery.Selection) {
 		header := s.Find("th.ddlabel p small")
 		if header.Length() != 0 {
 			keys = make([]string, 13)
-			for i, n := range header.Nodes {
-				keys[i] = strings.Replace(n.FirstChild.Data, " ", "", -1)
+			for j, n := range header.Nodes {
+				keys[j] = strings.Replace(n.FirstChild.Data, " ", "", -1)
 			}
 			if len(keys) != 13 {
 				keyerr = errs.New("the wrong number of columns were found in the document")
 			}
 			return
 		}
-		courses := s.Find("td.dddefault")
 
-		values := make([]string, 0, 13)
-		courses.Each(func(k int, ss *goquery.Selection) {
-			values = append(values, strings.Trim(ss.Text(), "\n \t"))
-		})
-		course, err := newCourse(values)
-		if err != nil && len(values) == 12 {
-			// if we found an error and there are
-			// only 12 values we skip this edge case
-			// has to do with a few classes having
-			// two different locations
-			return
+		var (
+			val     string
+			ss      *goquery.Selection
+			courses = s.Find("td.dddefault small")
+			values  = make([]string, 0, 13)
+		)
+
+		// Get each row value
+		for _, n := range courses.Nodes {
+			ss = &goquery.Selection{Nodes: []*html.Node{n}}
+			val = strings.Trim(ss.Text(), "\n \t\u00a0")
+			values = append(values, val)
 		}
-		if err != nil {
+		// clean out empty values
+		for i := 0; i < len(values); i++ {
+			val = values[i]
+			if val == "\u00a0" || val == "" {
+				continue
+			} else {
+				values = values[i:]
+				break
+			}
+		}
+
+		// Handle short rows, this happens occationally when
+		// a course has two different times
+		switch values[0] {
+		case "EXAM":
+			var (
+				lect *Course
+				ok   bool
+			)
+			// Find the crn for the previous row
+			// which is the course this exam belongs to
+			lectCRN, err := getPrevCRN(s)
+			if err == errPrevNotFound {
+				return
+			} else if err != nil {
+				goto HandleErrExam
+			}
+			lect, ok = schedule[int(lectCRN)]
+			if !ok {
+				err = errors.New("could not find lecture for this exam")
+				goto HandleErrExam
+			}
+			lect.Exam, err = parseExam(values, year)
+			if err != nil {
+				goto HandleErrExam
+			}
+		HandleErrExam:
+			if err != nil && parseErr == nil {
+				parseErr = err
+			} else if err != nil {
+				log.Println("schedule: Internal error:", err)
+			}
+			return
+		case "LECT":
+			return // TODO figure out what to do with the second lecture time
+		case "LAB":
+			return // TODO figure out what to do with the second lab time
+		}
+
+		course, err := newCourse(values, year)
+		if err == errNotACourse {
 			panic(err)
+		} else if err != nil {
+			if parseErr == nil {
+				parseErr = err
+			}
+			return
 		}
 		course.order = order
 		schedule[course.CRN] = course
 		order++
 	})
-	return schedule, keyerr
+	if keyerr != nil {
+		return nil, keyerr
+	}
+	if parseErr != nil {
+		return nil, parseErr
+	}
+	return schedule, nil
 }
 
-func newCourse(data []string) (*Course, error) {
+func newCourse(data []string, year int) (*Course, error) {
 	if len(data) != 13 {
-		return nil, fmt.Errorf("cannot create a course with %d values", len(data))
+		return nil, errNotACourse
 	}
 	crn, err := strconv.Atoi(data[0])
 	if err != nil {
 		err = fmt.Errorf("could not parse crn: %w", err)
-		log.Println(err)
 		return nil, err
 	}
 	units, err := strconv.Atoi(data[3])
 	if err != nil {
 		err = fmt.Errorf("could not parse units: %w", err)
-		log.Println(err)
 		return nil, err
 	}
 	maxenrl, err := strconv.Atoi(data[10])
 	if err != nil {
 		err = fmt.Errorf("could not parse max enrollment: %w", err)
-		log.Println(err)
 		maxenrl = 0
+		return nil, err
 	}
 	activenrl, err := strconv.Atoi(data[11])
 	if err != nil {
 		err = fmt.Errorf("could not parse active enrollment: %w", err)
-		log.Println(err)
 		activenrl = 0
-		// return nil, err
+		return nil, err
 	}
 	timeStr := data[6]
 	c := &Course{
@@ -245,13 +330,20 @@ func newCourse(data []string) (*Course, error) {
 		ActiveEnrolled: activenrl,
 		seats:          data[12],
 	}
+	date, err := parseDateRange(data[8], year)
+	if err != nil {
+		return nil, err
+	}
+	c.Date = *date
 	c.Time.Start, c.Time.End, err = parseTime(timeStr)
 	if err != nil {
 		return nil, err
 	}
 	// parsing the course number from the course code
 	parts := strings.Split(c.Fullcode, "-")
-	if len(parts) >= 2 {
+	if len(parts) >= 3 {
+		// Fullcode has the form: <Subject>-<Number>-<Section>
+		c.Subject = parts[0]
 		end := parts[1][len(parts[1])-1]
 		if end < '0' || end > '9' {
 			parts[1] = trimInt(parts[1])
@@ -260,8 +352,98 @@ func newCourse(data []string) (*Course, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not parse course number: %w", err)
 		}
+		c.Section = parts[2]
 	}
 	return c, nil
+}
+
+func parseExam(values []string, year int) (*Exam, error) {
+	var (
+		err error
+	)
+	exam := &Exam{
+		Day:      listDays(values[1])[0],
+		Building: values[3],
+	}
+	exam.Time.Start, exam.Time.End, err = parseTime(values[2])
+	if err != nil {
+		return nil, err
+	}
+	date, err := parseDateRange(values[4], year)
+	if err != nil {
+		return nil, err
+	}
+	exam.Date = date.Start
+	return exam, nil
+}
+
+func getPrevCRN(s *goquery.Selection) (int, error) {
+	prev := s.Prev()
+	inner := prev.Find("td p a")
+	if inner.Text() == "" {
+		// return // TODO some lectures have two sections, so the previous
+		inner = prev.Prev().Find("td p a")
+		if inner.Text() == "" {
+			return 0, errPrevNotFound
+		}
+	}
+	crn, err := strconv.ParseInt(inner.Text(), 10, 32)
+	if err != nil {
+		return 0, err
+	}
+	return int(crn), nil
+}
+
+func (c *Course) setDate(dateRange string, year int) (err error) {
+	dates := strings.Split(dateRange, " ")
+	if len(dates) != 2 {
+		return errors.New("unexpected date format")
+	}
+	format := "02-Jan"
+	dates[0] = strings.ToTitle(dates[0])
+	dates[1] = strings.ToTitle(dates[1])
+
+	c.Date.Start, err = time.Parse(format, dates[0])
+	if err != nil {
+		return err
+	}
+	c.Date.End, err = time.Parse(format, dates[1])
+	if err != nil {
+		return err
+	}
+	c.Date.Start = c.Date.Start.AddDate(year, 0, 0)
+	c.Date.End = c.Date.End.AddDate(year, 0, 0)
+	return nil
+}
+
+type dateRange struct {
+	Start, End time.Time
+}
+
+func parseDateRange(dateString string, year int) (*dateRange, error) {
+	dates := strings.Split(dateString, " ")
+	if len(dates) != 2 {
+		return nil, errors.New("unexpected date format")
+	}
+	format := "02-Jan"
+	dates[0] = strings.ToTitle(dates[0])
+	dates[1] = strings.ToTitle(dates[1])
+
+	var (
+		date dateRange
+		err  error
+	)
+	date.Start, err = time.Parse(format, dates[0])
+	if err != nil {
+		return nil, err
+	}
+	date.End, err = time.Parse(format, dates[1])
+	if err != nil {
+		return nil, err
+	}
+	date.Start = date.Start.AddDate(year, 0, 0)
+	date.End = date.End.AddDate(year, 0, 0)
+	return &date, nil
 }
 
 func parseTime(ts string) (start time.Time, end time.Time, err error) {
