@@ -3,9 +3,11 @@ package ucm
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -92,7 +94,8 @@ type Course struct {
 	// Lab or Discussion section. If the object is
 	// a lecture then this should be 01
 	Section string
-	Title   string
+
+	Title string
 
 	Exam     *Exam
 	Units    int
@@ -101,19 +104,20 @@ type Course struct {
 	Time     struct {
 		Start, End time.Time
 	}
+
 	BuildingRoom string
-	StartEnd     string
 	Date         struct {
 		Start, End time.Time
 	}
 	Instructor string
 
-	MaxEnrolled    int
-	ActiveEnrolled int
+	Capacity int
+	Enrolled int
 
 	timeStr string
 	seats   string
 	order   int
+	infoURL string
 }
 
 // Exam is a course exam
@@ -151,6 +155,40 @@ func (c *Course) SeatsOpen() int {
 		return 0
 	}
 	return seats
+}
+
+// Info get extra info for the course
+func (c *Course) Info() (string, error) {
+	var (
+		parts = strings.Split(c.infoURL, "?")
+		path  string
+		query string
+	)
+	switch len(parts) {
+	case 0:
+		return "", errors.New("bad url")
+	case 2:
+		query = parts[1]
+		fallthrough
+	case 1:
+		path = parts[0]
+	}
+	req := &http.Request{
+		Method: "GET",
+		Proto:  "HTTP/1.1",
+		URL: &url.URL{
+			Scheme:   "https",
+			Host:     "mystudentrecord.ucmerced.edu",
+			Path:     filepath.Join(basePath, path),
+			RawQuery: query,
+		},
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	return parseInfoPage(resp.Body)
 }
 
 // Get gets the schedule
@@ -206,13 +244,18 @@ func getSchedule(year int, term, subject string, open bool) (Schedule, error) {
 		}
 
 		var (
+			course  Course
 			val     string
 			ss      *goquery.Selection
-			courses = s.Find("td.dddefault small")
 			values  = make([]string, 0, 13)
+			courses = s.Find("td.dddefault small")
 		)
-
 		// Get each row value
+		ss = &goquery.Selection{Nodes: []*html.Node{courses.Nodes[0]}}
+		lnk, ok := ss.ChildrenFiltered("a").Attr("href")
+		if ok {
+			course.infoURL = lnk
+		}
 		for _, n := range courses.Nodes {
 			ss = &goquery.Selection{Nodes: []*html.Node{n}}
 			val = strings.Trim(ss.Text(), "\n \t\u00a0")
@@ -258,7 +301,8 @@ func getSchedule(year int, term, subject string, open bool) (Schedule, error) {
 			if err != nil && parseErr == nil {
 				parseErr = err
 			} else if err != nil {
-				log.Println("schedule: Internal error:", err)
+				log.Println("ucm: schedule: Internal error:", err) // TODO figure out a system to handle this
+				return
 			}
 			return
 		case "LECT":
@@ -266,8 +310,7 @@ func getSchedule(year int, term, subject string, open bool) (Schedule, error) {
 		case "LAB":
 			return // TODO figure out what to do with the second lab time
 		}
-
-		course, err := newCourse(values, year)
+		_, err = newCourse(&course, values, year)
 		if err == errNotACourse {
 			panic(err)
 		} else if err != nil {
@@ -277,7 +320,7 @@ func getSchedule(year int, term, subject string, open bool) (Schedule, error) {
 			return
 		}
 		course.order = order
-		schedule[course.CRN] = course
+		schedule[course.CRN] = &course
 		order++
 	})
 	if keyerr != nil {
@@ -289,7 +332,7 @@ func getSchedule(year int, term, subject string, open bool) (Schedule, error) {
 	return schedule, nil
 }
 
-func newCourse(data []string, year int) (*Course, error) {
+func newCourse(c *Course, data []string, year int) (*Course, error) {
 	if len(data) != 13 {
 		return nil, errNotACourse
 	}
@@ -303,10 +346,10 @@ func newCourse(data []string, year int) (*Course, error) {
 		err = fmt.Errorf("could not parse units: %w", err)
 		return nil, err
 	}
-	maxenrl, err := strconv.Atoi(data[10])
+	capacity, err := strconv.Atoi(data[10])
 	if err != nil {
 		err = fmt.Errorf("could not parse max enrollment: %w", err)
-		maxenrl = 0
+		capacity = 0
 		return nil, err
 	}
 	activenrl, err := strconv.Atoi(data[11])
@@ -316,20 +359,17 @@ func newCourse(data []string, year int) (*Course, error) {
 		return nil, err
 	}
 	timeStr := data[6]
-	c := &Course{
-		CRN:            crn,
-		Fullcode:       data[1],
-		Title:          data[2],
-		Units:          units,
-		Activity:       data[4],
-		Days:           listDays(data[5]),
-		BuildingRoom:   data[7],
-		StartEnd:       data[8],
-		Instructor:     data[9],
-		MaxEnrolled:    maxenrl,
-		ActiveEnrolled: activenrl,
-		seats:          data[12],
-	}
+	c.CRN = crn
+	c.Fullcode = data[1]
+	c.Title = data[2]
+	c.Units = units
+	c.Activity = data[4]
+	c.Days = listDays(data[5])
+	c.BuildingRoom = data[7]
+	c.Instructor = data[9]
+	c.Capacity = capacity
+	c.Enrolled = activenrl
+	c.seats = data[12]
 	date, err := parseDateRange(data[8], year)
 	if err != nil {
 		return nil, err
@@ -381,17 +421,30 @@ func getPrevCRN(s *goquery.Selection) (int, error) {
 	prev := s.Prev()
 	inner := prev.Find("td p a")
 	if inner.Text() == "" {
-		// return // TODO some lectures have two sections, so the previous
-		inner = prev.Prev().Find("td p a")
-		if inner.Text() == "" {
-			return 0, errPrevNotFound
-		}
+		// TODO sometimes the extra info is two leves deep
+		return 0, errPrevNotFound
 	}
 	crn, err := strconv.ParseInt(inner.Text(), 10, 32)
 	if err != nil {
 		return 0, err
 	}
 	return int(crn), nil
+}
+
+func parseInfoPage(r io.Reader) (string, error) {
+	doc, err := goquery.NewDocumentFromReader(r)
+	if err != nil {
+		return "", err
+	}
+	vals := make([]string, 0, 4)
+	res := doc.Find("div.pagebodydiv table.dataentrytable tbody td")
+	res.Each(func(i int, s *goquery.Selection) {
+		vals = append(vals, s.Text())
+	})
+	if strings.ToLower(vals[0]) != "description:" {
+		return "", errors.New("expected a description")
+	}
+	return vals[1], nil
 }
 
 func (c *Course) setDate(dateRange string, year int) (err error) {
@@ -495,6 +548,11 @@ func listDays(daystr string) (days []time.Weekday) {
 
 var client http.Client
 
+const (
+	baseHost = "mystudentrecord.ucmerced.edu"
+	basePath = "/pls/PROD"
+)
+
 func getData(year, term, subject string, openclasses bool) (*http.Response, error) {
 	termcode, ok := terms[term]
 	if !ok {
@@ -520,7 +578,7 @@ func getData(year, term, subject string, openclasses bool) (*http.Response, erro
 		URL: &url.URL{
 			Scheme:   "https",
 			Host:     "mystudentrecord.ucmerced.edu",
-			Path:     "/pls/PROD/xhwschedule.P_ViewSchedule",
+			Path:     filepath.Join(basePath, "/xhwschedule.P_ViewSchedule"),
 			RawQuery: params.Encode(),
 		},
 	}
