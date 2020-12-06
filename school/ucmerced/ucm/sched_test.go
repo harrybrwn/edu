@@ -52,6 +52,7 @@ func TestSched_Err(t *testing.T) {
 }
 
 func TestGetFall(t *testing.T) {
+	t.Skip("this test doen't actuall test anything... fix it")
 	sc, err := Get(2020, "fall", true)
 	if err != nil {
 		t.Error(err)

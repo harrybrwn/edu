@@ -441,6 +441,9 @@ func parseInfoPage(r io.Reader) (string, error) {
 	res.Each(func(i int, s *goquery.Selection) {
 		vals = append(vals, s.Text())
 	})
+	if len(vals) == 0 {
+		return "", errors.New("no page info found")
+	}
 	if strings.ToLower(vals[0]) != "description:" {
 		return "", errors.New("expected a description")
 	}
