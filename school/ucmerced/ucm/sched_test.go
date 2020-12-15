@@ -17,13 +17,13 @@ const (
 var (
 	mu   sync.Mutex
 	once sync.Once
-	buf  bytes.Buffer
+	raw  []byte
 )
 
 func getTestData(t *testing.T) io.Reader {
 	t.Helper()
-	b := bytes.Buffer{}
 	once.Do(func() {
+		var buf bytes.Buffer
 		resp, err := getData(fmt.Sprintf("%d", testyear), testterm, "", false)
 		if err != nil {
 			t.Fatal(err)
@@ -32,11 +32,9 @@ func getTestData(t *testing.T) io.Reader {
 		if _, err = buf.ReadFrom(resp.Body); err != nil {
 			t.Fatal(err)
 		}
+		raw = buf.Bytes()
 	})
-	mu.Lock()
-	b.ReadFrom(&buf)
-	mu.Unlock()
-	return &b
+	return bytes.NewBuffer(raw)
 }
 
 func testSchedule(t *testing.T) Schedule {
@@ -120,6 +118,9 @@ func TestSchedule(t *testing.T) {
 
 func TestInfo(t *testing.T) {
 	sc := testSchedule(t)
+	if len(sc) == 0 {
+		t.Fatal("testSchedule is empty")
+	}
 	for _, c := range sc {
 		info, err := c.Info()
 		if err != nil {
@@ -128,7 +129,6 @@ func TestInfo(t *testing.T) {
 		if len(info) == 0 {
 			t.Error("empty info string")
 		}
-		fmt.Println(info)
 		break
 	}
 }
