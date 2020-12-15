@@ -300,10 +300,10 @@ Outer:
 			if err != nil {
 				return nil, err
 			}
-			order++
 			course.order = order
 			course.infoURL = row.infoURL
 			sch[course.CRN] = &course
+			order++
 		default:
 			return nil, errors.New("invalid row kind")
 		}
