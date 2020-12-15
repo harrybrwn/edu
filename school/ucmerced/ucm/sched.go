@@ -181,6 +181,8 @@ func (c *Course) SeatsOpen() int {
 
 // Info get extra info for the course
 func (c *Course) Info() (string, error) {
+	// The info url is relative so we can't just
+	// call url.Parse to get the query
 	var (
 		parts = strings.Split(c.infoURL, "?")
 		path  string
@@ -282,8 +284,16 @@ Outer:
 			}
 		case kindMultiLab:
 			// TODO handle multiple lab section times
+			//
+			// This is goint to require support for multiple
+			// start and end times, which is going to be annoying
+			// because the only thing I can think of is changing
+			// the date field to a slice of time.Time which will be
+			// a huge compatibility issue (good thing no one uses
+			// this but me)
 		case kindMultiLect:
 			// TODO handle multiple lectures times
+			// see above.
 		case kindCourse:
 			row = rows[i]
 			_, err = newCourse(&course, row.values, year)
@@ -428,6 +438,7 @@ func newCourse(c *Course, data []string, year int) (*Course, error) {
 	c.Capacity = capacity
 	c.Enrolled = activenrl
 	c.seats = data[12]
+
 	date, err := parseDateRange(data[8], year)
 	if err != nil {
 		return nil, err

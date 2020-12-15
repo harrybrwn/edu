@@ -100,6 +100,39 @@ func TestParser(t *testing.T) {
 	}
 }
 
+func TestSchedule(t *testing.T) {
+	sc := testSchedule(t)
+	if len(sc) != sc.Len() {
+		t.Fatal("someting has gone terribly wrong")
+	}
+	if len(sc.Courses()) != sc.Len() {
+		t.Error("wait what???")
+	}
+	if len(sc.Ordered()) != sc.Len() {
+		t.Error("ok this is getting rediculous")
+	}
+	for crn, c := range sc {
+		if sc.Get(crn) != c {
+			t.Error("should be the same pointer")
+		}
+	}
+}
+
+func TestInfo(t *testing.T) {
+	sc := testSchedule(t)
+	for _, c := range sc {
+		info, err := c.Info()
+		if err != nil {
+			t.Error(err)
+		}
+		if len(info) == 0 {
+			t.Error("empty info string")
+		}
+		fmt.Println(info)
+		break
+	}
+}
+
 func TestGet(t *testing.T) {
 	sch := testSchedule(t)
 	for crn, course := range sch {
