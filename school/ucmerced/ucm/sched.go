@@ -26,6 +26,21 @@ var terms = map[string]string{
 	"fall":   "30",
 }
 
+// CourseType is a label for the type of course
+// i.e. lecture, lab, discussion, etc.
+type CourseType string
+
+// These are the only course types
+const (
+	Lecture    CourseType = "LECT"
+	Lab        CourseType = "LAB"
+	Discussion CourseType = "DISC"
+	Seminar    CourseType = "SEM"
+	Studio     CourseType = "STDO"
+	FiedWork   CourseType = "FLDW"
+	Initiative CourseType = "INI" // TODO still not sure what this means, sticking with initiative for now
+)
+
 // ScheduleConfig holds options for getting
 // the UC Merced schedule
 type ScheduleConfig struct {
@@ -45,6 +60,12 @@ func NewSchedule(config ScheduleConfig) (Schedule, error) {
 		return nil, err
 	}
 	return sched, nil
+}
+
+// SubjectsOffered will pull down the courses offered for a semester
+func SubjectsOffered(config ScheduleConfig) (map[string]string, error) {
+	var subjects = make(map[string]string)
+	return subjects, errors.New("not implemented")
 }
 
 // Get will get a course given the course id
@@ -95,11 +116,12 @@ type Course struct {
 	// a lecture then this should be 01
 	Section string
 
+	// Course title
 	Title string
 
 	Exam     *Exam
 	Units    int
-	Activity string
+	Activity string // TODO this should be changed to "Type CourseType"
 	Days     []time.Weekday
 	Time     struct {
 		Start, End time.Time
@@ -201,36 +223,121 @@ func BySubject(year int, term, subject string, open bool) (Schedule, error) {
 	return getSchedule(year, term, subject, open)
 }
 
-var (
-	errNotACourse   = errors.New("not a course")
-	errPrevNotFound = errors.New("crn not found in previous html element")
-)
-
-// bySubject gets the schedule and only one subject given a subject code.
 func getSchedule(year int, term, subject string, open bool) (Schedule, error) {
 	resp, err := getData(fmt.Sprintf("%d", year), term, strings.ToUpper(subject), open)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, errs.New(resp.Status)
 	}
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	rows, err := parseRows(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return parse(rows, year)
+}
+
+var (
+	errNotACourse   = errors.New("not a course")
+	errPrevNotFound = errors.New("crn not found in previous html element")
+)
+
+func parse(rows []*row, year int) (Schedule, error) {
+	var (
+		length = len(rows)
+		sch    = make(Schedule, length)
+		err    error
+		row    *row
+		order  = 0
+	)
+
+Outer:
+	for i := 0; i < length; i++ {
+		var course Course
+		switch rows[i].kind {
+		case kindHeader:
+			// Skip headers, might want to check
+			// that things have not changed just
+			// to future proof the parser.
+			continue
+		case kindExam:
+			exam, err := parseExam(rows[i].values, year)
+			if err != nil {
+				return nil, err
+			}
+			// backtrack to find the last course
+			// for this exam
+			for j := i; i > 0; j-- {
+				switch rows[j].kind {
+				case kindHeader:
+					return nil, errors.New("could not find exam's course crn")
+				case kindCourse:
+					// TODO check for multiple exams
+					sch[rows[j].crn].Exam = exam
+					continue Outer
+				default:
+				}
+			}
+		case kindMultiLab:
+			// TODO handle multiple lab section times
+		case kindMultiLect:
+			// TODO handle multiple lectures times
+		case kindCourse:
+			row = rows[i]
+			_, err = newCourse(&course, row.values, year)
+			if err != nil {
+				return nil, err
+			}
+			order++
+			course.order = order
+			course.infoURL = row.infoURL
+			sch[course.CRN] = &course
+		default:
+			return nil, errors.New("invalid row kind")
+		}
+	}
+	return sch, nil
+}
+
+const (
+	kindCourse uint8 = iota
+	// header
+	kindHeader
+	// an exam
+	kindExam
+	// course has multiple lecture times
+	kindMultiLect
+	// lab has multiple meeting times
+	kindMultiLab
+)
+
+type row struct {
+	kind    uint8
+	infoURL string
+	values  []string
+	crn     int
+}
+
+// parseRows takes the raw data and gets the
+// table and cleans up each row. Its almost like
+// a lexical analysis step.
+func parseRows(r io.Reader) ([]*row, error) {
+	doc, err := goquery.NewDocumentFromReader(r)
 	if err != nil {
 		return nil, err
 	}
 	const selector = "div.pagebodydiv table.datadisplaytable tr"
 	var (
-		selection        = doc.Find(selector)
-		schedule         = Schedule{}
-		keys             = make([]string, 13)
-		keyerr, parseErr error
-		order            = 0
+		selection = doc.Find(selector)
+		keys      []string
+		keyerr    error
+		rows      = make([]*row, 0, 512)
 	)
 
 	selection.Each(func(i int, s *goquery.Selection) {
+		var row = &row{}
 		header := s.Find("th.ddlabel p small")
 		if header.Length() != 0 {
 			keys = make([]string, 13)
@@ -240,30 +347,34 @@ func getSchedule(year int, term, subject string, open bool) (Schedule, error) {
 			if len(keys) != 13 {
 				keyerr = errs.New("the wrong number of columns were found in the document")
 			}
+			row.kind = kindHeader
+			rows = append(rows, row)
 			return
 		}
 
 		var (
-			course  Course
 			val     string
 			ss      *goquery.Selection
 			values  = make([]string, 0, 13)
 			courses = s.Find("td.dddefault small")
 		)
+
 		// Get each row value
 		ss = &goquery.Selection{Nodes: []*html.Node{courses.Nodes[0]}}
 		lnk, ok := ss.ChildrenFiltered("a").Attr("href")
 		if ok {
-			course.infoURL = lnk
+			row.infoURL = lnk
 		}
 		for _, n := range courses.Nodes {
 			ss = &goquery.Selection{Nodes: []*html.Node{n}}
 			val = strings.Trim(ss.Text(), "\n \t\u00a0")
 			values = append(values, val)
 		}
-		// clean out empty values
+		// Clean out empty table values
 		for i := 0; i < len(values); i++ {
 			val = values[i]
+			// some of the empty table cells have
+			// some weird unicode that we don't want
 			if val == "\u00a0" || val == "" {
 				continue
 			} else {
@@ -272,64 +383,33 @@ func getSchedule(year int, term, subject string, open bool) (Schedule, error) {
 			}
 		}
 
-		// Handle short rows, this happens occationally when
-		// a course has two different times
 		switch values[0] {
 		case "EXAM":
-			var (
-				lect *Course
-				ok   bool
-			)
-			// Find the crn for the previous row
-			// which is the course this exam belongs to
-			lectCRN, err := getPrevCRN(s)
-			if err == errPrevNotFound {
-				return
-			} else if err != nil {
-				goto HandleErrExam
-			}
-			lect, ok = schedule[int(lectCRN)]
-			if !ok {
-				err = errors.New("could not find lecture for this exam")
-				goto HandleErrExam
-			}
-			lect.Exam, err = parseExam(values, year)
-			if err != nil {
-				goto HandleErrExam
-			}
-		HandleErrExam:
-			if err != nil && parseErr == nil {
-				parseErr = err
-			} else if err != nil {
-				log.Println("ucm: schedule: Internal error:", err) // TODO figure out a system to handle this
-				return
-			}
-			return
-		case "LECT":
-			return // TODO figure out what to do with the second lecture time
+			row.kind = kindExam // mark as an exam row
 		case "LAB":
-			return // TODO figure out what to do with the second lab time
-		}
-		_, err = newCourse(&course, values, year)
-		if err == errNotACourse {
-			panic(err)
-		} else if err != nil {
-			if parseErr == nil {
-				parseErr = err
+			// This happens when there is a lab with two meeting times
+			row.kind = kindMultiLab
+		case "LECT":
+			// This happens when a lecture has multiple meeting times
+			row.kind = kindMultiLect
+		default: // otherwise we will just get a CRN
+			crn, e := strconv.ParseInt(values[0], 10, 32)
+			if e != nil {
+				if err == nil {
+					err = e
+				}
+				log.Println("could not parse crn")
+				return
 			}
-			return
+			row.crn = int(crn)
 		}
-		course.order = order
-		schedule[course.CRN] = &course
-		order++
+		row.values = values
+		rows = append(rows, row)
 	})
 	if keyerr != nil {
 		return nil, keyerr
 	}
-	if parseErr != nil {
-		return nil, parseErr
-	}
-	return schedule, nil
+	return rows, nil
 }
 
 func newCourse(c *Course, data []string, year int) (*Course, error) {
@@ -417,20 +497,6 @@ func parseExam(values []string, year int) (*Exam, error) {
 	return exam, nil
 }
 
-func getPrevCRN(s *goquery.Selection) (int, error) {
-	prev := s.Prev()
-	inner := prev.Find("td p a")
-	if inner.Text() == "" {
-		// TODO sometimes the extra info is two leves deep
-		return 0, errPrevNotFound
-	}
-	crn, err := strconv.ParseInt(inner.Text(), 10, 32)
-	if err != nil {
-		return 0, err
-	}
-	return int(crn), nil
-}
-
 func parseInfoPage(r io.Reader) (string, error) {
 	doc, err := goquery.NewDocumentFromReader(r)
 	if err != nil {
@@ -515,7 +581,6 @@ func parseTime(ts string) (start time.Time, end time.Time, err error) {
 	if err = errs.Pair(e1, e2); err != nil {
 		return
 	}
-
 	diff := end.Hour() - start.Hour()
 	if end.Hour() >= 12 && diff >= 12 {
 		start = start.Add(12 * time.Hour)
@@ -583,6 +648,9 @@ func getData(year, term, subject string, openclasses bool) (*http.Response, erro
 			Host:     "mystudentrecord.ucmerced.edu",
 			Path:     filepath.Join(basePath, "/xhwschedule.P_ViewSchedule"),
 			RawQuery: params.Encode(),
+		},
+		Header: http.Header{
+			"User-Agent": {fmt.Sprintf("go-edu-%v", time.Now().Nanosecond())},
 		},
 	}
 	return client.Do(req)

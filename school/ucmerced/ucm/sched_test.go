@@ -3,19 +3,104 @@ package ucm
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net/http"
+	"sync"
 	"testing"
 )
 
-func Test(t *testing.T) {
+const (
+	testyear = 2021
+	testterm = "spring"
+)
 
+var (
+	mu   sync.Mutex
+	once sync.Once
+	buf  bytes.Buffer
+)
+
+func getTestData(t *testing.T) io.Reader {
+	t.Helper()
+	b := bytes.Buffer{}
+	once.Do(func() {
+		resp, err := getData(fmt.Sprintf("%d", testyear), testterm, "", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		if _, err = buf.ReadFrom(resp.Body); err != nil {
+			t.Fatal(err)
+		}
+	})
+	mu.Lock()
+	b.ReadFrom(&buf)
+	mu.Unlock()
+	return &b
 }
 
-func TestGet(t *testing.T) {
-	sch, err := Get(2020, "spring", false)
+func testSchedule(t *testing.T) Schedule {
+	t.Helper()
+	// note: uses data from spring 2021
+	r := getTestData(t)
+	rows, err := parseRows(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sc, err := parse(rows, 2021)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return sc
+}
+
+func Test(t *testing.T) {
+	r := getTestData(t)
+	rows, err := parseRows(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) == 0 {
+		t.Fatal("did not parse any rows")
+	}
+	sc, err := parse(rows, 2021)
 	if err != nil {
 		t.Error(err)
 	}
+
+	for _, row := range rows {
+		if row.crn == 0 {
+			continue
+		}
+		if c, ok := sc[row.crn]; ok {
+			if c.Exam == nil {
+				continue
+			}
+		} else {
+			t.Error("should be a course here")
+		}
+		if row.kind == kindExam {
+			t.Error("should have found this exam")
+		}
+	}
+	sch := testSchedule(t)
+	for crn, course := range sch {
+		c, ok := sc[crn]
+		if !ok {
+			t.Errorf("%d should be in both schedules", crn)
+		}
+		if !cmp(c, course) {
+			t.Error("courses should be the same")
+		}
+	}
+}
+
+func TestGet(t *testing.T) {
+	// sch, err := Get(testyear, "spring", false)
+	// if err != nil {
+	// 	t.Error(err)
+	// }
+	sch := testSchedule(t)
 	for crn, course := range sch {
 		if crn == 0 {
 			t.Error("should not have a crn of zero")
@@ -34,14 +119,14 @@ func TestGet(t *testing.T) {
 			t.Error("should not be zero")
 		}
 	}
-	sch, err = BySubject(2020, "spring", "cse", false)
+	sch, err := BySubject(2020, "spring", "cse", false)
 	if err != nil {
 		t.Error(err)
 	}
 }
 
 func TestSched_Err(t *testing.T) {
-	_, err := Get(2020, "", true)
+	_, err := Get(testyear, "", true)
 	if err == nil {
 		t.Error("expected an error for a bad term")
 	}
@@ -53,7 +138,7 @@ func TestSched_Err(t *testing.T) {
 
 func TestGetFall(t *testing.T) {
 	t.Skip("this test doen't actuall test anything... fix it")
-	sc, err := Get(2020, "fall", true)
+	sc, err := Get(testyear, "fall", true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -111,4 +196,13 @@ func TestScratch(t *testing.T) {
 		t.Error(err)
 	}
 	fmt.Println(b.String())
+}
+
+func cmp(a, b *Course) bool {
+	return a.CRN == b.CRN && a.Fullcode == b.Fullcode &&
+		a.Subject == b.Subject && a.Number == b.Number &&
+		a.Section == b.Section && a.Title == b.Title &&
+		a.Units == b.Units && a.Activity == b.Activity &&
+		a.BuildingRoom == b.BuildingRoom && a.Instructor == b.Instructor &&
+		a.Capacity == b.Capacity && a.Enrolled == b.Enrolled && a.seats == b.seats
 }
