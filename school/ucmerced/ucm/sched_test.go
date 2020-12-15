@@ -55,6 +55,9 @@ func testSchedule(t *testing.T) Schedule {
 }
 
 func Test(t *testing.T) {
+}
+
+func TestParser(t *testing.T) {
 	r := getTestData(t)
 	rows, err := parseRows(r)
 	if err != nil {
@@ -75,6 +78,8 @@ func Test(t *testing.T) {
 		if c, ok := sc[row.crn]; ok {
 			if c.Exam == nil {
 				continue
+				// } else if c.Activity != "LECT" && c.CRN == 10163 {
+				// 	fmt.Println(c.CRN, c.Activity)
 			}
 		} else {
 			t.Error("should be a course here")
@@ -96,10 +101,6 @@ func Test(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	// sch, err := Get(testyear, "spring", false)
-	// if err != nil {
-	// 	t.Error(err)
-	// }
 	sch := testSchedule(t)
 	for crn, course := range sch {
 		if crn == 0 {
@@ -199,10 +200,17 @@ func TestScratch(t *testing.T) {
 }
 
 func cmp(a, b *Course) bool {
-	return a.CRN == b.CRN && a.Fullcode == b.Fullcode &&
-		a.Subject == b.Subject && a.Number == b.Number &&
-		a.Section == b.Section && a.Title == b.Title &&
-		a.Units == b.Units && a.Activity == b.Activity &&
-		a.BuildingRoom == b.BuildingRoom && a.Instructor == b.Instructor &&
-		a.Capacity == b.Capacity && a.Enrolled == b.Enrolled && a.seats == b.seats
+	return a.CRN == b.CRN &&
+		a.Fullcode == b.Fullcode &&
+		a.Subject == b.Subject &&
+		a.Number == b.Number &&
+		a.Section == b.Section &&
+		a.Title == b.Title &&
+		a.Units == b.Units &&
+		a.Activity == b.Activity &&
+		a.BuildingRoom == b.BuildingRoom &&
+		a.Instructor == b.Instructor &&
+		a.Capacity == b.Capacity &&
+		a.Enrolled == b.Enrolled &&
+		a.seats == b.seats
 }

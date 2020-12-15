@@ -15,7 +15,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/harrybrwn/edu/school"
 	"github.com/harrybrwn/errs"
-	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 )
 
 const selector = "div.pagebodydiv table.datadisplaytable tr"
@@ -353,34 +353,18 @@ func parseRows(r io.Reader) ([]*row, error) {
 		}
 
 		var (
-			val     string
-			ss      *goquery.Selection
 			values  = make([]string, 0, 13)
 			courses = s.Find("td.dddefault small")
 		)
 
-		// Get each row value
-		ss = &goquery.Selection{Nodes: []*html.Node{courses.Nodes[0]}}
-		lnk, ok := ss.ChildrenFiltered("a").Attr("href")
-		if ok {
-			row.infoURL = lnk
+		nd := courses.Nodes[0].FirstChild
+		if nd.DataAtom == atom.A && len(nd.Attr) > 0 && nd.Attr[0].Key == "href" {
+			row.infoURL = nd.Attr[0].Val
+			values = append(values, nd.FirstChild.Data)
+			courses.Nodes = courses.Nodes[1:]
 		}
 		for _, n := range courses.Nodes {
-			ss = &goquery.Selection{Nodes: []*html.Node{n}}
-			val = strings.Trim(ss.Text(), "\n \t\u00a0")
-			values = append(values, val)
-		}
-		// Clean out empty table values
-		for i := 0; i < len(values); i++ {
-			val = values[i]
-			// some of the empty table cells have
-			// some weird unicode that we don't want
-			if val == "\u00a0" || val == "" {
-				continue
-			} else {
-				values = values[i:]
-				break
-			}
+			values = append(values, n.FirstChild.Data)
 		}
 
 		switch values[0] {
@@ -418,25 +402,19 @@ func newCourse(c *Course, data []string, year int) (*Course, error) {
 	}
 	crn, err := strconv.Atoi(data[0])
 	if err != nil {
-		err = fmt.Errorf("could not parse crn: %w", err)
-		return nil, err
+		return nil, fmt.Errorf("could not parse crn: %w", err)
 	}
 	units, err := strconv.Atoi(data[3])
 	if err != nil {
-		err = fmt.Errorf("could not parse units: %w", err)
-		return nil, err
+		return nil, fmt.Errorf("could not parse units: %w", err)
 	}
 	capacity, err := strconv.Atoi(data[10])
 	if err != nil {
-		err = fmt.Errorf("could not parse max enrollment: %w", err)
-		capacity = 0
-		return nil, err
+		return nil, fmt.Errorf("could not parse max enrollment: %w", err)
 	}
 	activenrl, err := strconv.Atoi(data[11])
 	if err != nil {
-		err = fmt.Errorf("could not parse active enrollment: %w", err)
-		activenrl = 0
-		return nil, err
+		return nil, fmt.Errorf("could not parse active enrollment: %w", err)
 	}
 	timeStr := data[6]
 	c.CRN = crn
