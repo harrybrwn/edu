@@ -18,6 +18,9 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
+// TODO get subject and terms from
+// 	    here https://mystudentrecord.ucmerced.edu/pls/PROD/xhwschedule.p_selectsubject
+
 const selector = "div.pagebodydiv table.datadisplaytable tr"
 
 var terms = map[string]string{
@@ -39,6 +42,8 @@ const (
 	Studio     CourseType = "STDO"
 	FiedWork   CourseType = "FLDW"
 	Initiative CourseType = "INI" // TODO still not sure what this means, sticking with initiative for now
+
+	// TODO: add PRA, however there is only one PRA class
 )
 
 // ScheduleConfig holds options for getting
@@ -596,9 +601,12 @@ var dayMap = map[rune]time.Weekday{
 }
 
 func listDays(daystr string) (days []time.Weekday) {
-	days = make([]time.Weekday, len(daystr))
-	for i, char := range daystr {
-		days[i] = dayMap[char]
+	days = make([]time.Weekday, 0, len(daystr))
+	for _, char := range daystr {
+		if char == 0xa0 || char == 0x20 {
+			continue
+		}
+		days = append(days, dayMap[char])
 	}
 	return days
 }
@@ -629,6 +637,8 @@ func getData(year, term, subject string, openclasses bool) (*http.Response, erro
 		"openclasses": {open},
 		"subjcode":    {strings.ToUpper(subject)},
 	}
+	// TODO change this to POST the params as form data
+	// curl -s -X POST 'https://mystudentrecord.ucmerced.edu/pls/PROD/xhwschedule.P_ViewSchedule' --form validterm=202020 --form openclasses=N
 	req := &http.Request{
 		Method: "GET",
 		Proto:  "HTTP/1.1",
