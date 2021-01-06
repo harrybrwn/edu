@@ -38,5 +38,5 @@ If your preferred method of installation is not supported you can always go to t
 ## Canvas
 To use any of the features that interact with canvas (the update and canvas commands), you need to [get an api token](https://community.canvaslms.com/docs/DOC-16005-42121018197) for your student account. For more info read the [configuration docs](/docs/config.md#token)
 
-## Coniguration
+## Configuration
 See the [configuration docs](/docs/config.md). For config example, see [my example config](/docs/example_config.yml)
