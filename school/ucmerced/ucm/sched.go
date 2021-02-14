@@ -299,6 +299,7 @@ Outer:
 		case kindMultiLect:
 			// TODO handle multiple lectures times
 			// see above.
+		case kindDiscussion:
 		case kindCourse:
 			row = rows[i]
 			_, err = newCourse(&course, row.values, year)
@@ -326,6 +327,7 @@ const (
 	kindMultiLect
 	// lab has multiple meeting times
 	kindMultiLab
+	kindDiscussion
 )
 
 type row struct {
@@ -391,13 +393,16 @@ func parseRows(r io.Reader) ([]*row, error) {
 		case "LECT":
 			// This happens when a lecture has multiple meeting times
 			row.kind = kindMultiLect
+		case "DISC":
+			// Multiple discussion sections
+			row.kind = kindDiscussion
 		default: // otherwise we will just get a CRN
 			crn, e := strconv.ParseInt(values[0], 10, 32)
 			if e != nil {
 				if err == nil {
 					err = e
 				}
-				log.Println("could not parse crn")
+				log.Printf("could not parse crn: %v", values[0]) // this sometimes causes problems
 				return
 			}
 			row.crn = int(crn)
@@ -611,7 +616,19 @@ func listDays(daystr string) (days []time.Weekday) {
 	return days
 }
 
-var client http.Client
+var client = http.Client{
+	Timeout: time.Second * 15,
+}
+
+// SetClientTimeout sets the client timeout
+func SetClientTimeout(tm time.Duration) {
+	client.Timeout = tm
+}
+
+// SetHTTPClient lets callers set the package level http client
+func SetHTTPClient(c http.Client) {
+	client = c
+}
 
 const (
 	baseHost = "mystudentrecord.ucmerced.edu"
