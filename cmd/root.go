@@ -5,6 +5,7 @@ import (
 	stdlog "log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/gen2brain/beeep"
 	"github.com/harrybrwn/config"
@@ -88,7 +89,7 @@ func Execute() (err error) {
 	globalFlags := opts.Global{}
 	globalFlags.AddToFlagSet(root.PersistentFlags())
 
-	root.SetUsageTemplate(commandTemplate)
+	root.SetUsageTemplate(config.IndentedCobraHelpTemplate)
 	root.AddCommand(append(
 		commands.All(&globalFlags),
 		completionCmd,
@@ -191,8 +192,20 @@ func errmsg(msg interface{}) {
 	fmt.Fprintf(os.Stderr, "Error: %v\n", msg)
 }
 
+func init() {
+	cobra.AddTemplateFunc("indent", indent)
+}
+
+func indent(s string) string {
+	parts := strings.Split(s, "\n")
+	for i := range parts {
+		parts[i] = "    " + parts[i]
+	}
+	return strings.Join(parts, "\n")
+}
+
 var commandTemplate = `Usage:
-{{if .Runnable}}
+{{ if (or .Runnable .HasAvailableSubCommands) }}
 	{{.UseLine}}{{end}}{{if gt (len .Aliases) 0}}
 
 Aliases:
@@ -207,11 +220,11 @@ Available Commands:
 
 Flags:
 
-{{.LocalFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasAvailableInheritedFlags}}
+{{.LocalFlags.FlagUsages | trimTrailingWhitespaces | indent}}{{end}}{{if .HasAvailableInheritedFlags}}
 
 Global Flags:
 
-{{.InheritedFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasHelpSubCommands}}
+{{.InheritedFlags.FlagUsages | trimTrailingWhitespaces | indent}}{{end}}{{if .HasHelpSubCommands}}
 
 Additional help topics:
 {{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}

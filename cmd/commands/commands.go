@@ -14,6 +14,7 @@ import (
 	"github.com/harrybrwn/edu/cmd/internal"
 	"github.com/harrybrwn/edu/cmd/internal/files"
 	"github.com/harrybrwn/edu/cmd/internal/opts"
+	"github.com/harrybrwn/edu/cmd/print"
 	"github.com/harrybrwn/edu/pkg/term"
 	"github.com/harrybrwn/go-canvas"
 	"github.com/spf13/cobra"
@@ -168,18 +169,18 @@ func newCourseCmd(globals *opts.Global) *cobra.Command {
 				tab.Render()
 			} else if ass {
 				internal.SetTableHeader(tab, []string{"id", "name", "due date"}, !globals.NoColor)
-				var dates dueDates
+				var dates print.DueDates
 				for as := range course.Assignments() {
 					dueAt := as.DueAt.Local()
-					dates = append(dates, dueDate{
-						id:   strconv.Itoa(as.ID),
-						name: as.Name,
-						date: dueAt,
+					dates = append(dates, print.DueDate{
+						Id:   strconv.Itoa(as.ID),
+						Name: as.Name,
+						Date: dueAt,
 					})
 				}
 				sort.Sort(dates)
 				for _, d := range dates {
-					tab.Append([]string{d.id, d.name, d.date.Format(time.RFC822)})
+					tab.Append([]string{d.Id, d.Name, d.Date.Format(time.RFC822)})
 				}
 				tab.Render()
 			} else {

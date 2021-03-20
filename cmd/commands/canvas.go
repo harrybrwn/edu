@@ -55,25 +55,6 @@ func (ff *fileFinder) addToFlagSet(flagset *pflag.FlagSet) {
 	flagset.StringVar(&ff.search, "search", "", "search for files by name")
 }
 
-type dueDate struct {
-	id, name string
-	date     time.Time
-}
-
-type dueDates []dueDate
-
-func (dd dueDates) Len() int {
-	return len(dd)
-}
-
-func (dd dueDates) Swap(i, j int) {
-	dd[i], dd[j] = dd[j], dd[i]
-}
-
-func (dd dueDates) Less(i, j int) bool {
-	return dd[i].date.Before(dd[j].date)
-}
-
 func newDueCmd(flags *opts.Global) *cobra.Command {
 	var nolinks, all bool
 	dueCmd := &cobra.Command{
@@ -110,7 +91,7 @@ func newDueCmd(flags *opts.Global) *cobra.Command {
 			wg.Add(len(courses))
 			tab := internal.NewTable(cmd.OutOrStdout())
 			tab.SetAutoWrapText(false)
-			internal.SetTableHeader(tab, []string{"id", "name", "due"}, !flags.NoColor)
+			internal.SetTableHeader(tab, []string{"id", "name", "due", "time remaining"}, !flags.NoColor)
 			tab.SetAutoWrapText(true)
 			tab.SetColWidth(50)
 
@@ -119,9 +100,11 @@ func newDueCmd(flags *opts.Global) *cobra.Command {
 				WaitGroup: &wg,
 				Table:     tab,
 				Now:       time.Now(),
+				Location:  time.Local, // parameterize this with time.LoadLocation
+				All:       all,
 			}
 			for _, course := range courses {
-				go printer.PrintCourseAssignments(course, all)
+				go printer.PrintCourseAssignments(course)
 			}
 			wg.Wait()
 			return nil
