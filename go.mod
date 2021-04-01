@@ -19,5 +19,3 @@ require (
 	golang.org/x/net v0.0.0-20200202094626-16171245cfb2
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
-
-replace github.com/harrybrwn/go-canvas => ../../pkg/go-canvas
