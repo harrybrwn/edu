@@ -5,7 +5,7 @@ go 1.14
 require (
 	github.com/PuerkitoBio/goquery v1.5.1
 	github.com/gen2brain/beeep v0.0.0-20200526185328-e9c15c258e28
-	github.com/harrybrwn/config v0.1.2
+	github.com/harrybrwn/config v0.1.3-0.20210330012954-9c22bfe9b076
 	github.com/harrybrwn/errs v0.0.2-0.20200523142445-e4279967174e
 	github.com/harrybrwn/go-canvas v0.0.2-0.20200821044925-04b08bcecf29
 	github.com/jaytaylor/html2text v0.0.0-20200412013138-3577fbdbcff7

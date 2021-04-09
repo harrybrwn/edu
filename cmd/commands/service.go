@@ -45,7 +45,7 @@ func genServiceCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:    "service",
 		Short:  "Generate and install a systemd service that runs 'edu' registration watch",
-		Hidden: false,
+		Hidden: true,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			if len(args) == 1 {
 				filename = args[0]

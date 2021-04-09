@@ -88,6 +88,7 @@ registration information.`,
 					return err
 				}
 			}
+
 			schedule, err := schedule.New(school.UCMerced, &schedule.Config{
 				Year:         sflags.year,
 				Term:         sflags.term,
@@ -289,12 +290,6 @@ func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
 		smsNotify    = config.GetBool("watch.sms_notify")
 		smsRecipient string
 	)
-	if term != "" {
-		sflags.term = term
-	}
-	if year != 0 {
-		sflags.year = year
-	}
 
 	c := &cobra.Command{
 		Use:   "watch",
@@ -302,6 +297,12 @@ func newWatchCmd(sflags *scheduleFlags) *cobra.Command {
 		Long: "Watch for availability changes in a list of CRNs." +
 			"",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if term != "" {
+				sflags.term = term
+			}
+			if year != 0 {
+				sflags.year = year
+			}
 			basecrns, err := stroiArr(args)
 			if err != nil {
 				return err

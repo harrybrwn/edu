@@ -54,10 +54,12 @@ github.com/gorilla/websocket v1.4.0/go.mod h1:E7qHFY5m1UJ88s3WnNqhKjPHQ0heANvMoA
 github.com/grpc-ecosystem/go-grpc-middleware v1.0.0/go.mod h1:FiyG127CGDf3tlThmgyCl78X/SZQqEOJBCDaAfeWzPs=
 github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0/go.mod h1:8NvIoxWQoOIhqOTXgfV/d3M/q6VIi02HzZEHgUlZvzk=
 github.com/grpc-ecosystem/grpc-gateway v1.9.0/go.mod h1:vNeuVxBJEsws4ogUvrchl83t/GYV9WGTSLVdBhOQFDY=
-github.com/harrybrwn/config v0.1.2 h1:rn0f7CS57jDBwnNRaYaR1pQLFHSPaPhxykZMTlV62tY=
-github.com/harrybrwn/config v0.1.2/go.mod h1:IjSHsW0yu6IH8q3KGLg1HwOhBc1KL8KiNU2nNRFEh6U=
+github.com/harrybrwn/config v0.1.3-0.20210330012954-9c22bfe9b076 h1:QRS1XQ3OIVikfampjrbLcH/nFw3t/emn/XvsbZhgfGc=
+github.com/harrybrwn/config v0.1.3-0.20210330012954-9c22bfe9b076/go.mod h1:IjSHsW0yu6IH8q3KGLg1HwOhBc1KL8KiNU2nNRFEh6U=
 github.com/harrybrwn/errs v0.0.2-0.20200523142445-e4279967174e h1:RtaB1O5oXuA5jbz3TprWGk3KcfsaS5pkBnanTARjXSI=
 github.com/harrybrwn/errs v0.0.2-0.20200523142445-e4279967174e/go.mod h1:xekiTrup1h5u3YF9bpJT7qD1cmgYBA8qN9iHd/h/sho=
+github.com/harrybrwn/go-canvas v0.0.2-0.20200821044925-04b08bcecf29 h1:/aL4+pznAb3w4Vxc2BixmShPeDW5X/FL+iQKqRqZzUM=
+github.com/harrybrwn/go-canvas v0.0.2-0.20200821044925-04b08bcecf29/go.mod h1:bC9IrjKdu7XVstPy+lAvPYH07W3TgD6m796BjqF5QWo=
 github.com/harrybrwn/go-querystring v1.0.1-0.20200812230556-de172bc021ad h1:1aAZGfm8SrKkfVODudFMNcDNq2eflHTxFXqjzucxNOA=
 github.com/harrybrwn/go-querystring v1.0.1-0.20200812230556-de172bc021ad/go.mod h1:vgIvUzro/BNvc4qAmR133SLQZDvURWGxCesSpBnjeQc=
 github.com/hashicorp/hcl v1.0.0/go.mod h1:E5yfLk+7swimpb2L/Alb/PJmXilQ/rhwaUYs4T20WEQ=

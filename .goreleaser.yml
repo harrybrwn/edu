@@ -17,6 +17,8 @@ builds:
     env:
       - CGO_ENABLED=0
       - GO111MODULE=on
+    flags:
+      - -trimpath
     ldflags:
       - -s -w
       - -X github.com/harrybrwn/edu/cmd.version={{.Version}}

@@ -1,5 +1,5 @@
 VERSION=$(shell git describe --tags --abbrev=0)-$(shell git rev-parse --short HEAD)
-GOFLAGS=-ldflags "-w -s -X $(shell go list)/cmd.version=$(VERSION)"
+GOFLAGS=-trimpath -ldflags "-w -s -X $(shell go list)/cmd.version=$(VERSION)"
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 
@@ -16,7 +16,7 @@ service:
 	edu service --install
 
 snapshot:
-	goreleaser release --skip-publish --snapshot
+	goreleaser release --rm-dist --skip-publish --snapshot
 
 clean:
 	go clean

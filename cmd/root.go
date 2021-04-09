@@ -150,6 +150,7 @@ completion. Note: for zsh you will need to use the command
 		Use:    "test",
 		Hidden: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			fmt.Println(os.UserHomeDir())
 			return errors.New("test command doesn't do anything")
 		},
 	}
